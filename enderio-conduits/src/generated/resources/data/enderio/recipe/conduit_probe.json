@@ -1,0 +1,38 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "key": {
+    "A": {
+      "item": "enderio:conductive_alloy_ingot"
+    },
+    "C": {
+      "item": "minecraft:comparator"
+    },
+    "I": [
+      {
+        "item": "enderio:conduit"
+      },
+      {
+        "item": "enderio:conduit"
+      },
+      {
+        "item": "enderio:conduit"
+      }
+    ],
+    "P": {
+      "tag": "c:glass_panes"
+    },
+    "R": {
+      "item": "enderio:conduit"
+    }
+  },
+  "pattern": [
+    "ARA",
+    "PCP",
+    "RIR"
+  ],
+  "result": {
+    "count": 1,
+    "id": "enderio:conduit_probe"
+  }
+}
