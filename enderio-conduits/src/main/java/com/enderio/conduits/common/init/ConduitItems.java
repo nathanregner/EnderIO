@@ -1,12 +1,17 @@
 package com.enderio.conduits.common.init;
 
+import com.enderio.base.api.EnderIO;
+import com.enderio.base.common.filter.AbstractFilterItem;
+import com.enderio.base.common.init.EIOCapabilities;
 import com.enderio.base.common.init.EIOCreativeTabs;
+import com.enderio.base.common.tag.EIOTags;
 import com.enderio.conduits.EnderIOConduits;
 import com.enderio.conduits.api.ConduitCapabilities;
 import com.enderio.conduits.api.facade.FacadeType;
 import com.enderio.conduits.client.ConduitFacadeColor;
 import com.enderio.conduits.common.conduit.facades.ComponentBackedConduitFacadeProvider;
 import com.enderio.conduits.common.conduit.facades.ConduitFacadeItem;
+import com.enderio.conduits.common.items.ConduitProbeItem;
 import com.enderio.conduits.common.redstone.DoubleRedstoneChannel;
 import com.enderio.conduits.common.redstone.RedstoneCountFilter;
 import com.enderio.conduits.common.redstone.RedstoneFilterItem;
@@ -15,13 +20,18 @@ import com.enderio.conduits.common.redstone.RedstoneTimerFilter;
 import com.enderio.conduits.data.model.FacadeItemModelBuilder;
 import com.enderio.regilite.holder.RegiliteItem;
 import com.enderio.regilite.registry.ItemRegistry;
-import java.util.function.Supplier;
 import net.minecraft.core.component.DataComponentType;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.TagKey;
 import net.minecraft.util.Unit;
 import net.minecraft.world.inventory.MenuType;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.function.Supplier;
+
+import static com.enderio.conduits.common.init.ConduitComponents.CONDUIT_PROBE_STATE;
 
 public class ConduitItems {
     private static final ItemRegistry ITEM_REGISTRY = EnderIOConduits.REGILITE.itemRegistry();
@@ -92,6 +102,27 @@ public class ConduitItems {
     public static final RegiliteItem<RedstoneFilterItem> TIMER_FILTER = createRedstoneFilter("redstone_timer_filter",
             ConduitComponents.REDSTONE_TIMER_FILTER, RedstoneTimerFilter.INSTANCE, ConduitMenus.REDSTONE_TIMER_FILTER::get)
         .addCapability(ConduitCapabilities.REDSTONE_EXTRACT_FILTER, RedstoneFilterItem.TIMER_FILTER_PROVIDER);
+
+    public static final RegiliteItem<ConduitProbeItem> CONDUIT_PROBE = ITEM_REGISTRY
+        .registerItem("conduit_probe", ConduitProbeItem::new)
+//        .setModelProvider((prov, ctx) -> {
+//            var generatedItem = EnderIO.loc("item/generated");
+//            prov
+//                .withExistingParent(ctx.getName(), generatedItem)
+//                .texture("layer0", EnderIO.loc("item/conduit_probe_probe"))
+//                .override()
+//                .predicate(ResourceLocation.parse(CONDUIT_PROBE_STATE.getRegisteredName()), ConduitProbeItem.State.PROBE.ordinal())
+//                .model(prov.withExistingParent("conduit_probe_probe", generatedItem)
+//                    .texture("layer0", EnderIO.loc("item/conduit_probe_probe")))
+//                .end()
+//                .override()
+//                .predicate(ResourceLocation.parse(CONDUIT_PROBE_STATE.getRegisteredName()), ConduitProbeItem.State.COPY_PASTE.ordinal())
+//                .model(prov.withExistingParent("conduit_probe_copy", generatedItem)
+//                    .texture("layer0", EnderIO.loc("item/conduit_probe_copy")))
+//                .end();
+//        })
+        .setTab(EIOCreativeTabs.GEAR)
+        .addItemTags(EIOTags.Items.HIDE_FACADES);
 
     public static <T> RegiliteItem<RedstoneFilterItem> createRedstoneFilter(String name,
             DeferredHolder<DataComponentType<?>, DataComponentType<T>> type, T defaultValue,

@@ -3,8 +3,10 @@ package com.enderio.conduits.common.conduit.bundle;
 import com.enderio.conduits.EnderIOConduits;
 import com.enderio.conduits.common.conduit.menu.ConduitMenu;
 import com.enderio.conduits.common.init.ConduitBlocks;
+import com.enderio.conduits.common.items.ConduitProbeItem;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -36,6 +38,9 @@ public class ConduitBlockEvent {
                 var conduitConnection = conduitBundle.getShape().getConnectionFromHit(pos, hit);
 
                 if (conduitConnection != null) {
+                    if (event.getItemStack().getItem() instanceof ConduitProbeItem) {
+                        return;
+                    }
                     if (conduitBundle.canOpenScreen(conduitConnection.getSecond(), conduitConnection.getFirst())) {
                         if (event.getEntity() instanceof ServerPlayer serverPlayer) {
                             ConduitMenu.openConduitMenu(serverPlayer, conduitBundle, conduitConnection.getFirst(),

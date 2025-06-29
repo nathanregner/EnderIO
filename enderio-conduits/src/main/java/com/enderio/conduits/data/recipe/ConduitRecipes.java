@@ -11,7 +11,6 @@ import com.enderio.conduits.common.init.Conduits;
 import com.enderio.conduits.common.recipe.ConduitIngredient;
 import com.enderio.machines.EnderIOMachines;
 import com.enderio.machines.common.blocks.painting.PaintingRecipe;
-import java.util.concurrent.CompletableFuture;
 import net.minecraft.advancements.critereon.InventoryChangeTrigger;
 import net.minecraft.core.HolderGetter;
 import net.minecraft.core.HolderLookup;
@@ -25,7 +24,10 @@ import net.minecraft.data.recipes.ShapelessRecipeBuilder;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.ItemLike;
+import net.neoforged.neoforge.common.Tags;
 import net.neoforged.neoforge.common.conditions.ModLoadedCondition;
+
+import java.util.concurrent.CompletableFuture;
 
 public class ConduitRecipes extends RecipeProvider {
 
@@ -176,6 +178,22 @@ public class ConduitRecipes extends RecipeProvider {
                 .unlockedBy("has_ingredient", InventoryChangeTrigger.TriggerInstance.hasItems(EIOItems.CONDUIT_BINDER))
                 .save(recipeOutput, EnderIO.loc("redstone_conduit"));
 
+        ShapedRecipeBuilder
+            .shaped(RecipeCategory.TOOLS, ConduitItems.CONDUIT_PROBE)
+            .pattern("ARA")
+            .pattern("PCP")
+            .pattern("RIR")
+            .define('P', Tags.Items.GLASS_PANES)
+            .define('I', Ingredient.of(
+                ConduitBlockItem.getStackFor(energyConduit, 1),
+                ConduitBlockItem.getStackFor(enhancedEnergyConduit, 1),
+                ConduitBlockItem.getStackFor(enderEnergyConduit, 1)
+            ))
+            .define('A', EIOItems.CONDUCTIVE_ALLOY_INGOT)
+            .define('C', Items.COMPARATOR)
+            .define('R', Ingredient.of(ConduitBlockItem.getStackFor(redstoneConduit, 1)))
+            .unlockedBy("has_ingredient", InventoryChangeTrigger.TriggerInstance.hasItems(EIOItems.CONDUCTIVE_ALLOY_INGOT))
+            .save(recipeOutput, EnderIO.loc("conduit_probe"));
     }
 
     private void buildFilterErasureRecipes(RecipeOutput recipeOutput) {

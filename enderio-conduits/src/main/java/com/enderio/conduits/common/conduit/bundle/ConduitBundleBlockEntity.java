@@ -1695,8 +1695,7 @@ public final class ConduitBundleBlockEntity extends EnderBlockEntity
 
         public static final class ConduitConnection {
 
-            public static final Codec<ConduitConnection> CODEC = ConnectionState.CODEC.listOf(0, MAX_CONDUITS)
-                    .xmap(ConduitConnection::new, i -> Arrays.stream(i.connectionStates).toList());
+            public static final Codec<ConduitConnection> CODEC = ConnectionState.CODEC.listOf(0, MAX_CONDUITS).xmap(ConduitConnection::new, i -> Arrays.stream(i.connectionStates).toList());
 
             private final ConnectionState[] connectionStates = Util.make(() -> {
                 var states = new ConnectionState[MAX_CONDUITS];

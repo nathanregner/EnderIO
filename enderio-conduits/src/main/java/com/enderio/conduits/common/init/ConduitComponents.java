@@ -3,6 +3,7 @@ package com.enderio.conduits.common.init;
 import com.enderio.base.api.EnderIO;
 import com.enderio.conduits.api.Conduit;
 import com.enderio.conduits.api.facade.FacadeType;
+import com.enderio.conduits.common.items.ConduitProbeItem;
 import com.enderio.conduits.common.redstone.DoubleRedstoneChannel;
 import com.enderio.conduits.common.redstone.RedstoneCountFilter;
 import com.enderio.conduits.common.redstone.RedstoneTLatchFilter;
@@ -85,6 +86,16 @@ public class ConduitComponents {
             .registerComponentType("redstone_xor_filter",
                     builder -> builder.persistent(DoubleRedstoneChannel.Component.CODEC)
                             .networkSynchronized(DoubleRedstoneChannel.Component.STREAM_CODEC));
+
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<ConduitProbeItem.State>> CONDUIT_PROBE_STATE = DATA_COMPONENT_TYPES
+        .registerComponentType("conduit_probe_state",
+            builder -> builder.persistent(ConduitProbeItem.State.CODEC)
+                .networkSynchronized(ConduitProbeItem.State.STREAM_CODEC));
+
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<ConduitProbeItem.ConduitConfigs>> CONDUIT_PROBE_CONFIG = DATA_COMPONENT_TYPES
+        .registerComponentType("conduit_probe_config",
+            builder -> builder.persistent(ConduitProbeItem.CODEC)
+                .networkSynchronized(ConduitProbeItem.STREAM_CODEC));
 
     public static void register(IEventBus bus) {
         DATA_COMPONENT_TYPES.register(bus);
