@@ -1,5 +1,6 @@
 {
   "values": [
-    "enderio:conduit"
+    "enderio:conduit",
+    "enderio:conduit_probe"
   ]
 }
