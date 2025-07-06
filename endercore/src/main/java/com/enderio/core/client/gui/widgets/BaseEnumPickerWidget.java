@@ -23,6 +23,7 @@ public abstract class BaseEnumPickerWidget<T extends Enum<T>> extends EnderButto
     private final Class<T> clazz;
     private final Supplier<T> getter;
     private final Consumer<T> setter;
+    private final boolean shouldAdvanceOnPress;
 
     private T previousValue;
 
@@ -41,12 +42,13 @@ public abstract class BaseEnumPickerWidget<T extends Enum<T>> extends EnderButto
     private final Component optionName;
 
     public BaseEnumPickerWidget(int pX, int pY, int width, int height, Class<T> clazz, Supplier<T> getter,
-            Consumer<T> setter, Component optionName) {
+            Consumer<T> setter, boolean shouldAdvanceOnPress, Component optionName) {
         super(pX, pY, width, height, Component.empty());
 
         this.clazz = clazz;
         this.getter = getter;
         this.setter = setter;
+        this.shouldAdvanceOnPress = shouldAdvanceOnPress;
         this.optionName = optionName;
 
         T[] values = getValues();
@@ -91,13 +93,24 @@ public abstract class BaseEnumPickerWidget<T extends Enum<T>> extends EnderButto
         return clazz.getEnumConstants();
     }
 
+    public int getValueIndex(T value) {
+        int i = 0;
+        for (T t : getValues()) {
+            if (t == value) {
+                return i;
+            }
+            i++;
+        }
+        return i;
+    }
+
     private T getValue() {
         return getter.get();
     }
 
     private void setValue(T value) {
         setter.accept(value);
-        updateTooltip(value);
+        updateTooltip(getValue());
     }
 
     private Vector2i calculateFirstPosition(T icon, int amount) {
@@ -122,13 +135,30 @@ public abstract class BaseEnumPickerWidget<T extends Enum<T>> extends EnderButto
         if (isExpanded()) {
             selectNext(mouseButton != InputConstants.MOUSE_BUTTON_RIGHT);
         } else {
+            if (shouldAdvanceOnPress) {
+                selectNext(mouseButton != InputConstants.MOUSE_BUTTON_RIGHT);
+            }
             Minecraft.getInstance().pushGuiLayer(selection);
         }
     }
 
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if (scrollY > 0) {
+            selectNext(false);
+            return true;
+        }
+        if (scrollY < 0) {
+            selectNext(true);
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+    }
+
     private void selectNext(boolean isForward) {
         T[] values = getValues();
-        int index = getValue().ordinal() + (isForward ? 1 : -1) + values.length;
+        int index = getValueIndex(getValue()) + (isForward ? 1 : -1) + values.length;
+
         setValue(values[index % values.length]);
     }
 
@@ -224,6 +254,13 @@ public abstract class BaseEnumPickerWidget<T extends Enum<T>> extends EnderButto
         @Override
         public boolean isPauseScreen() {
             return false;
+        }
+
+        @Override
+        public void onClose() {
+            super.onClose();
+            // Close the underlying GUI as well, player pressing escape likely wants to close the screen, not the popout
+            minecraft.popGuiLayer();
         }
 
         @Override

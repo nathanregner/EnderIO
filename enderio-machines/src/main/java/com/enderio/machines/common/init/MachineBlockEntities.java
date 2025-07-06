@@ -2,11 +2,11 @@ package com.enderio.machines.common.init;
 
 import com.enderio.base.common.init.EIOBlocks;
 import com.enderio.base.common.init.EIOCapabilities;
+import com.enderio.base.common.init.EIOItems;
 import com.enderio.machines.EnderIOMachines;
 import com.enderio.machines.client.rendering.blockentity.CapacitorBankBER;
 import com.enderio.machines.client.rendering.blockentity.FluidTankBER;
 import com.enderio.machines.client.rendering.blockentity.ObeliskBER;
-import com.enderio.machines.client.rendering.blockentity.XPObeliskBER;
 import com.enderio.machines.common.attachment.FluidTankUser;
 import com.enderio.machines.common.blockentity.CreativePowerBlockEntity;
 import com.enderio.machines.common.blockentity.base.LegacyMachineBlockEntity;
@@ -16,19 +16,23 @@ import com.enderio.machines.common.blockentity.capacitorbank.CapacitorTier;
 import com.enderio.machines.common.blockentity.solar.SolarPanelBlockEntity;
 import com.enderio.machines.common.blockentity.solar.SolarPanelTier;
 import com.enderio.machines.common.blocks.alloy.AlloySmelterBlockEntity;
-import com.enderio.machines.common.blocks.alloy.PrimitiveAlloySmelterBlockEntity;
 import com.enderio.machines.common.blocks.base.blockentity.MachineBlockEntity;
 import com.enderio.machines.common.blocks.base.blockentity.PoweredMachineBlockEntity;
 import com.enderio.machines.common.blocks.crafter.CrafterBlockEntity;
 import com.enderio.machines.common.blocks.drain.DrainBlockEntity;
 import com.enderio.machines.common.blocks.enchanter.EnchanterBlockEntity;
+import com.enderio.machines.common.blocks.enderface.EnderfaceBlockEntity;
+import com.enderio.machines.common.blocks.farming_station.FarmingStationBlockEntity;
 import com.enderio.machines.common.blocks.fluid_tank.FluidTankBlockEntity;
 import com.enderio.machines.common.blocks.impulse_hopper.ImpulseHopperBlockEntity;
+import com.enderio.machines.common.blocks.obelisks.attractor.AttractorObeliskBlockEntity;
 import com.enderio.machines.common.blocks.obelisks.aversion.AversionObeliskBlockEntity;
 import com.enderio.machines.common.blocks.obelisks.inhibitor.InhibitorObeliskBlockEntity;
 import com.enderio.machines.common.blocks.obelisks.relocator.RelocatorObeliskBlockEntity;
+import com.enderio.machines.common.blocks.obelisks.weather.WeatherObeliskBlockEntity;
 import com.enderio.machines.common.blocks.obelisks.xp.XPObeliskBlockEntity;
 import com.enderio.machines.common.blocks.painting.PaintingMachineBlockEntity;
+import com.enderio.machines.common.blocks.powered_spawner.MindKillerBlockEntity;
 import com.enderio.machines.common.blocks.powered_spawner.PoweredSpawnerBlockEntity;
 import com.enderio.machines.common.blocks.sag_mill.SagMillBlockEntity;
 import com.enderio.machines.common.blocks.slicer.SlicerBlockEntity;
@@ -41,13 +45,10 @@ import com.enderio.machines.common.blocks.vacuum.chest.VacuumChestBlockEntity;
 import com.enderio.machines.common.blocks.vacuum.xp.XPVacuumBlockEntity;
 import com.enderio.machines.common.blocks.vat.VatBlockEntity;
 import com.enderio.machines.common.blocks.wired_charger.WiredChargerBlockEntity;
+import com.enderio.machines.common.blocks.wireless_charger.WirelessChargerBlockEntity;
 import com.enderio.regilite.holder.RegiliteBlockEntity;
 import com.enderio.regilite.registry.BlockEntityRegistry;
 import com.google.common.collect.ImmutableMap;
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.Map;
-import java.util.function.Supplier;
 import net.minecraft.Util;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
@@ -55,6 +56,11 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.capabilities.Capabilities;
+
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
+import java.util.function.Supplier;
 
 public class MachineBlockEntities {
     private static final BlockEntityRegistry BLOCK_ENTITY_REGISTRY = EnderIOMachines.REGILITE.blockEntityRegistry();
@@ -73,12 +79,11 @@ public class MachineBlockEntities {
     public static final RegiliteBlockEntity<EnchanterBlockEntity> ENCHANTER = register("enchanter",
             EnchanterBlockEntity::new, MachineBlocks.ENCHANTER);
 
-    public static final RegiliteBlockEntity<PrimitiveAlloySmelterBlockEntity> PRIMITIVE_ALLOY_SMELTER = register(
-            "primitive_alloy_smelter", PrimitiveAlloySmelterBlockEntity::new, MachineBlocks.PRIMITIVE_ALLOY_SMELTER)
-                    .apply(MachineBlockEntities::machineBlockEntityCapabilities);
+    public static final RegiliteBlockEntity<EnderfaceBlockEntity> ENDERFACE = register("enderface",
+            EnderfaceBlockEntity::new, MachineBlocks.ENDERFACE);
 
     public static final RegiliteBlockEntity<AlloySmelterBlockEntity> ALLOY_SMELTER = register("alloy_smelter",
-            AlloySmelterBlockEntity::factory, MachineBlocks.ALLOY_SMELTER)
+            AlloySmelterBlockEntity::new, MachineBlocks.ALLOY_SMELTER)
                     .apply(MachineBlockEntities::poweredMachineBlockEntityCapabilities);
 
     public static final RegiliteBlockEntity<CreativePowerBlockEntity> CREATIVE_POWER = register("creative_power",
@@ -133,13 +138,18 @@ public class MachineBlockEntities {
             WiredChargerBlockEntity::new, MachineBlocks.WIRED_CHARGER)
                     .apply(MachineBlockEntities::poweredMachineBlockEntityCapabilities);
 
+    public static final RegiliteBlockEntity<WirelessChargerBlockEntity> WIRELESS_CHARGER = register("wireless_charger",
+            WirelessChargerBlockEntity::new, MachineBlocks.WIRELESS_CHARGER)
+                    .apply(MachineBlockEntities::poweredMachineBlockEntityCapabilities);
+
     public static final RegiliteBlockEntity<PaintingMachineBlockEntity> PAINTING_MACHINE = register("painting_machine",
             PaintingMachineBlockEntity::new, MachineBlocks.PAINTING_MACHINE)
                     .apply(MachineBlockEntities::poweredMachineBlockEntityCapabilities);
 
     public static final RegiliteBlockEntity<PoweredSpawnerBlockEntity> POWERED_SPAWNER = register("powered_spawner",
             PoweredSpawnerBlockEntity::new, MachineBlocks.POWERED_SPAWNER)
-                    .apply(MachineBlockEntities::poweredMachineBlockEntityCapabilities);
+                    .apply(MachineBlockEntities::poweredMachineBlockEntityCapabilities)
+                    .apply(MachineBlockEntities::soulBoundCapability);
 
     public static final Map<SolarPanelTier, RegiliteBlockEntity<SolarPanelBlockEntity>> SOLAR_PANELS = Util.make(() -> {
         Map<SolarPanelTier, RegiliteBlockEntity<SolarPanelBlockEntity>> map = new HashMap<>();
@@ -148,7 +158,8 @@ public class MachineBlockEntities {
                     register(tier.name().toLowerCase(Locale.ROOT) + "_photovoltaic_cell",
                             (worldPosition, blockState) -> new SolarPanelBlockEntity(worldPosition, blockState, tier),
                             () -> MachineBlocks.SOLAR_PANELS.get(tier).get())
-                                    .apply(MachineBlockEntities::legacyPoweredMachineBlockEntityCapabilities));
+                                    .apply(MachineBlockEntities::legacyPoweredMachineBlockEntityCapabilities))
+            ;
         }
         return ImmutableMap.copyOf(map);
     });
@@ -170,12 +181,12 @@ public class MachineBlockEntities {
     public static final RegiliteBlockEntity<SoulEngineBlockEntity> SOUL_ENGINE = register("soul_engine",
             SoulEngineBlockEntity::new, MachineBlocks.SOUL_ENGINE)
                     .apply(MachineBlockEntities::poweredMachineBlockEntityCapabilities)
-                    .apply(MachineBlockEntities::fluidHandlerCapability);
+                    .apply(MachineBlockEntities::fluidHandlerCapability)
+                    .apply(MachineBlockEntities::soulBoundCapability);
 
     public static final RegiliteBlockEntity<XPObeliskBlockEntity> XP_OBELISK = register("xp_obelisk",
-            XPObeliskBlockEntity::new, MachineBlocks.XP_OBELISK).setRenderer(() -> XPObeliskBER::new)
-                    // TODO: Make XP Obelisk use the common base class :)
-                    // .setRenderer(() -> ObeliskBER.factory(EIOItems.EXPERIENCE_ROD::get))
+            XPObeliskBlockEntity::new, MachineBlocks.XP_OBELISK)
+                    .setRenderer(() -> ObeliskBER.factory(EIOItems.VOID_VIAL::get))
                     .apply(MachineBlockEntities::machineBlockEntityCapabilities)
                     .apply(MachineBlockEntities::fluidHandlerCapability);
 
@@ -197,6 +208,27 @@ public class MachineBlockEntities {
             "relocator_obelisk", RelocatorObeliskBlockEntity::new, MachineBlocks.RELOCATOR_OBELISK)
                     .setRenderer(() -> ObeliskBER.factory(() -> Items.PRISMARINE))
                     .apply(MachineBlockEntities::poweredMachineBlockEntityCapabilities);
+
+    public static final RegiliteBlockEntity<AttractorObeliskBlockEntity> ATTRACTOR_OBELISK = register(
+            "attractor_obelisk", AttractorObeliskBlockEntity::new, MachineBlocks.ATTRACTOR_OBELISK)
+                    .setRenderer(() -> ObeliskBER.factory(EIOItems.ELECTROMAGNET::asItem))
+                    .apply(MachineBlockEntities::poweredMachineBlockEntityCapabilities);
+
+    public static final RegiliteBlockEntity<WeatherObeliskBlockEntity> WEATHER_OBELISK = register("weather_obelisk",
+            WeatherObeliskBlockEntity::new, MachineBlocks.WEATHER_OBELISK)
+                    .setRenderer(() -> ObeliskBER.factory(() -> Items.FIREWORK_ROCKET))
+                    .apply(MachineBlockEntities::machineBlockEntityCapabilities)
+                    .apply(MachineBlockEntities::fluidHandlerCapability);
+
+    public static final RegiliteBlockEntity<FarmingStationBlockEntity> FARMING_STATION = register("farming_station",
+            FarmingStationBlockEntity::new, MachineBlocks.FARMING_STATION)
+                    .apply(MachineBlockEntities::poweredMachineBlockEntityCapabilities)
+                    .apply(MachineBlockEntities::fluidHandlerCapability)
+                    .apply(MachineBlockEntities::soulBoundCapability);
+
+    public static final RegiliteBlockEntity<MindKillerBlockEntity> MIND_KILLER = BLOCK_ENTITY_REGISTRY.registerBlockEntity("mind_killer",
+        MindKillerBlockEntity::new, MachineBlocks.MIND_KILLER)
+                    .setRenderer(() -> ObeliskBER.factory(() -> Items.ZOMBIE_HEAD)); //TODO Custom model and BER maybe?
 
     @SafeVarargs
     private static <B extends BlockEntity> RegiliteBlockEntity<B> register(String name,
@@ -228,13 +260,12 @@ public class MachineBlockEntities {
         blockEntity.addCapability(Capabilities.EnergyStorage.BLOCK, PoweredMachineBlockEntity.ENERGY_STORAGE_PROVIDER);
     }
 
-    private static void legacyFluidHandlerCapability(
-            RegiliteBlockEntity<? extends LegacyMachineBlockEntity> blockEntity) {
+    private static void fluidHandlerCapability(RegiliteBlockEntity<? extends MachineBlockEntity> blockEntity) {
         blockEntity.addCapability(Capabilities.FluidHandler.BLOCK, FluidTankUser.FLUID_HANDLER_PROVIDER);
     }
 
-    private static void fluidHandlerCapability(RegiliteBlockEntity<? extends MachineBlockEntity> blockEntity) {
-        blockEntity.addCapability(Capabilities.FluidHandler.BLOCK, FluidTankUser.FLUID_HANDLER_PROVIDER);
+    private static void soulBoundCapability(RegiliteBlockEntity<? extends MachineBlockEntity> blockEntity) {
+        blockEntity.addCapability(EIOCapabilities.SoulBindable.BLOCK, MachineBlockEntity.SOUL_BINDABLE);
     }
 
     public static void register(IEventBus bus) {

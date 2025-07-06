@@ -1,52 +1,40 @@
 package com.enderio.conduits.common.conduit.type.energy;
 
-import com.enderio.conduits.api.ConduitNetworkContext;
-import com.enderio.conduits.api.ConduitNetworkContextType;
-import com.enderio.conduits.common.init.Conduits;
+import com.enderio.conduits.api.network.ConduitNetworkContext;
+import com.enderio.conduits.api.network.ConduitNetworkContextType;
+import com.enderio.conduits.api.network.IConduitNetwork;
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import java.util.Set;
 
 public class EnergyConduitNetworkContext implements ConduitNetworkContext<EnergyConduitNetworkContext> {
 
-    public static final Codec<EnergyConduitNetworkContext> CODEC = RecordCodecBuilder.create(
-        builder -> builder.group(
-            Codec.INT.fieldOf("energy_stored").forGetter(i -> i.energyStored),
-            Codec.INT.fieldOf("rotating_index").forGetter(i -> i.rotatingIndex)
-        ).apply(builder, EnergyConduitNetworkContext::new)
-    );
+    public static final MapCodec<EnergyConduitNetworkContext> CODEC = RecordCodecBuilder.mapCodec(builder -> builder
+            .group(Codec.LONG.fieldOf("energy_stored").forGetter(i -> i.energyStored))
+            .apply(builder, EnergyConduitNetworkContext::new));
 
-    private int energyStored = 0;
-    private int rotatingIndex = 0;
+    public static final ConduitNetworkContextType<EnergyConduitNetworkContext> TYPE = new ConduitNetworkContextType<>(CODEC,
+            EnergyConduitNetworkContext::new);
+
+    private long energyStored = 0;
 
     public EnergyConduitNetworkContext() {
     }
 
-    public EnergyConduitNetworkContext(int energyStored) {
+    public EnergyConduitNetworkContext(long energyStored) {
         this.energyStored = energyStored;
-    }
-
-    public EnergyConduitNetworkContext(int energyStored, int rotatingIndex) {
-        this.energyStored = energyStored;
-        this.rotatingIndex = rotatingIndex;
     }
 
     /**
      * @implNote Never trust the value stored here, always Min it with the capacity. When the graph splits, this will just be copied across all sides.
      */
-    public int energyStored() {
+    public long energyStored() {
         return energyStored;
     }
 
-    public void setEnergyStored(int energyStored) {
+    public void setEnergyStored(long energyStored) {
         this.energyStored = energyStored;
-    }
-
-    public int rotatingIndex() {
-        return rotatingIndex;
-    }
-
-    public void setRotatingIndex(int rotatingIndex) {
-        this.rotatingIndex = rotatingIndex;
     }
 
     @Override
@@ -55,12 +43,21 @@ public class EnergyConduitNetworkContext implements ConduitNetworkContext<Energy
     }
 
     @Override
-    public EnergyConduitNetworkContext copy() {
-        return new EnergyConduitNetworkContext(energyStored);
+    public EnergyConduitNetworkContext split(IConduitNetwork selfNetwork, Set<? extends IConduitNetwork> allNetworks) {
+        int totalNodes = allNetworks.stream().map(IConduitNetwork::nodeCount).reduce(0, Integer::sum);
+
+        // Avoid any divide by zero errors, even though they should never occur.
+        if (totalNodes == 0) {
+            return new EnergyConduitNetworkContext(0);
+        }
+
+        // Split stored energy based on the network size difference.
+        float proportion = selfNetwork.nodeCount() / (float) totalNodes;
+        return new EnergyConduitNetworkContext((long)Math.floor(proportion * energyStored));
     }
 
     @Override
     public ConduitNetworkContextType<EnergyConduitNetworkContext> type() {
-        return Conduits.ContextSerializers.ENERGY.get();
+        return TYPE;
     }
 }

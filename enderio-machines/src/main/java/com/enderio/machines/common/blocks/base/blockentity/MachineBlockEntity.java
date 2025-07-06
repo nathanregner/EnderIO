@@ -5,6 +5,7 @@ import com.enderio.base.api.capability.SideConfig;
 import com.enderio.base.api.io.IOConfigurable;
 import com.enderio.base.api.io.IOMode;
 import com.enderio.base.api.misc.RedstoneControl;
+import com.enderio.base.api.soul.binding.ISoulBindable;
 import com.enderio.base.common.block.EIOBlockEntity;
 import com.enderio.base.common.blockentity.Wrenchable;
 import com.enderio.machines.common.MachineNBTKeys;
@@ -24,6 +25,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
@@ -38,9 +40,9 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.ItemContainerContents;
+import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
@@ -67,6 +69,9 @@ public abstract class MachineBlockEntity extends EIOBlockEntity
     public static final ICapabilityProvider<MachineBlockEntity, Direction, IItemHandler> ITEM_HANDLER_PROVIDER = (be,
             side) -> be.inventory != null ? be.inventory.getForSide(side) : null;
 
+    public static final ICapabilityProvider<MachineBlockEntity, Void, ISoulBindable> SOUL_BINDABLE = (be, ctx)
+        -> be instanceof ISoulBindable bindable ? bindable : null;
+
     private static final ModelProperty<IOConfigurable> IO_CONFIG_PROPERTY = LegacyMachineBlockEntity.IO_CONFIG_PROPERTY;
 
     @Nullable
@@ -81,6 +86,9 @@ public abstract class MachineBlockEntity extends EIOBlockEntity
     private boolean isRedstoneBlocked;
 
     private final boolean supportsActiveState;
+
+    @Nullable
+    private UUID owner;
 
     public MachineBlockEntity(BlockEntityType<?> type, BlockPos worldPosition, BlockState blockState,
             boolean isIoConfigMutable) {
@@ -307,6 +315,16 @@ public abstract class MachineBlockEntity extends EIOBlockEntity
 
     // endregion
 
+    public void setMachineOwner(UUID owner) {
+        this.owner = owner;
+        setChanged();
+    }
+
+    @Nullable
+    public UUID getMachineOwner() {
+        return this.owner;
+    }
+
     // region Resource Distribution
 
     // TODO: I kind of want to rewrite this without relying on getSelfCapability.
@@ -401,8 +419,9 @@ public abstract class MachineBlockEntity extends EIOBlockEntity
             return;
         }
 
-        states.remove(state);
-        level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_ALL);
+        if (states.remove(state)) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_ALL);
+        }
     }
 
     // endregion
@@ -464,7 +483,8 @@ public abstract class MachineBlockEntity extends EIOBlockEntity
     // region Wrenchable Implementation
 
     @Override
-    public ItemInteractionResult onWrenched(@Nullable Player player, @Nullable Direction side) {
+    public ItemInteractionResult onWrenched(UseOnContext context) {
+        var player = context.getPlayer();
         if (player == null || level == null) {
             return ItemInteractionResult.SUCCESS;
         }
@@ -492,8 +512,8 @@ public abstract class MachineBlockEntity extends EIOBlockEntity
             return ItemInteractionResult.sidedSuccess(level.isClientSide());
         } else {
             if (level.isClientSide()) {
-                if (side != null && isIOConfigMutable()) {
-                    PacketDistributor.sendToServer(new CycleIOConfigPacket(worldPosition, side));
+                if (isIOConfigMutable()) {
+                    PacketDistributor.sendToServer(new CycleIOConfigPacket(worldPosition, context.getClickedFace()));
                 }
             }
 
@@ -541,6 +561,10 @@ public abstract class MachineBlockEntity extends EIOBlockEntity
         if (isIoConfigMutable && ioConfig != null) {
             tag.put(MachineNBTKeys.IO_CONFIG, ioConfig.save(registries));
         }
+
+        if (owner != null) {
+            tag.putUUID(MachineNBTKeys.OWNER, this.owner);
+        }
     }
 
     @SuppressWarnings("removal")
@@ -579,6 +603,10 @@ public abstract class MachineBlockEntity extends EIOBlockEntity
                 redstoneControl = RedstoneControl.parse(registries,
                         Objects.requireNonNull(tag.get(MachineNBTKeys.REDSTONE_CONTROL)));
             }
+        }
+
+        if (tag.contains(MachineNBTKeys.OWNER)) {
+            owner = tag.getUUID(MachineNBTKeys.OWNER);
         }
     }
 

@@ -2,7 +2,7 @@ package com.enderio.machines.common.blockentity.solar;
 
 import static com.enderio.machines.common.blocks.powered_spawner.PoweredSpawnerBlockEntity.NO_MOB;
 
-import com.enderio.base.api.attachment.StoredEntityData;
+import com.enderio.base.api.soul.Soul;
 import com.enderio.base.api.capacitor.FixedScalable;
 import com.enderio.base.api.io.IOMode;
 import com.enderio.base.api.io.energy.EnergyIOMode;
@@ -20,21 +20,26 @@ import com.enderio.machines.common.souldata.SolarSoul;
 import dev.gigaherz.graph3.Graph;
 import dev.gigaherz.graph3.GraphObject;
 import dev.gigaherz.graph3.Mergeable;
-import java.util.List;
-import java.util.Optional;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.client.event.RecipesUpdatedEvent;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
+import java.util.Optional;
+
+import static com.enderio.machines.common.blocks.powered_spawner.PoweredSpawnerBlockEntity.NO_MOB;
 
 public class SolarPanelBlockEntity extends LegacyPoweredMachineBlockEntity {
 
@@ -42,7 +47,7 @@ public class SolarPanelBlockEntity extends LegacyPoweredMachineBlockEntity {
 
     private final MultiEnergyNode node;
 
-    private StoredEntityData entityData = StoredEntityData.EMPTY;
+    private Soul boundSoul = Soul.EMPTY;
     private SolarSoul.SoulData soulData;
     private static boolean reload = false;
     private boolean reloadCache = !reload;
@@ -55,7 +60,7 @@ public class SolarPanelBlockEntity extends LegacyPoweredMachineBlockEntity {
         this.tier = tier;
         this.node = new MultiEnergyNode(() -> energyStorage,
                 () -> (MultiEnergyStorageWrapper) getExposedEnergyStorage(), worldPosition);
-        addDataSlot(NetworkDataSlot.RESOURCE_LOCATION.create(() -> this.getEntityType().orElse(NO_MOB),
+        addDataSlot(NetworkDataSlot.RESOURCE_LOCATION.create(() -> this.getEntityTypeId().orElse(NO_MOB),
                 this::setEntityType));
     }
 
@@ -75,8 +80,8 @@ public class SolarPanelBlockEntity extends LegacyPoweredMachineBlockEntity {
         if (isGenerating()) {
             getEnergyStorage().addEnergy(getGenerationRate());
         }
-        if (reloadCache != reload && entityData.hasEntity()) {
-            Optional<SolarSoul.SoulData> op = SolarSoul.SOLAR.matches(entityData.entityType().get());
+        if (reloadCache != reload && boundSoul.hasEntity()) {
+            Optional<SolarSoul.SoulData> op = SolarSoul.SOLAR.matches(boundSoul.entityType());
             op.ifPresent(data -> soulData = data);
             reloadCache = reload;
         }
@@ -103,69 +108,109 @@ public class SolarPanelBlockEntity extends LegacyPoweredMachineBlockEntity {
 
     /**
      * Calculates the generation rate for this solar panel.
-     * Only generates energy during day from 0 to  12_000 ticks (10 minute aka half a minecraft day), or
-     * if its day and either night or if it hasLiquidSunshine.
-     * Generation is scaled at the start and end of the day.
+     * Generates energy during day from 0 to  12_000 ticks (10 minute aka half a minecraft day)
+     * Generates energy during day from 12_000 to  24_000 ticks (10 minute aka half a minecraft day)
+     * Liquid Sunshine or/and Liquid Darkness make it always output at full power during the day/night.
+     * Generation is scaled at the start and end of the day/night.
      *
      * @return this solar panels generation rate.
      * @see SolarPanelBlockEntity#hasLiquidSunshine()
+     * @see SolarPanelBlockEntity#hasLiquidDarkness()
      */
     public int getGenerationRate() {
         if (level == null) {
             return 0;
         }
 
-        boolean day;
-        boolean night;
+        //When should the panel make power
+        boolean day = true;
+        boolean night = false;
         if (soulData != null) {
             day = soulData.daytime();
             night = soulData.nighttime();
-        } else {
-            day = level.isDay();
-            night = level.isNight();
         }
 
         float outputScale = 0;
-        if (day && (night || hasLiquidSunshine())) {
+        if ((day && night) || (day && hasLiquidSunshine()) || (night && hasLiquidDarkness())) {
             outputScale = 1;
         } else if (day) {
-            // A Day night cycle is 20 minutes, daytime is 10 minutes
+            outputScale = getOutputScale(level);
+        } else if (night) {
+            // A Day night cycle is 20 minutes, night is 10 minutes
             int dayTime = (int) (level.getDayTime() % GameTicks.DAY_IN_TICKS);
 
-            // Over how long should generation scale up/down and the start/end of the day
+            // Over how long should generation scale up/down and the start/end of the night
             float rampTimeMinutes = 1.5f;
-            float rampTimeTicks = GameTicks.MINUTE_IN_TICKS * rampTimeMinutes;
+            float rampTimeTicks = GameTicks.MINUTE_IN_TICKS * rampTimeMinutes + GameTicks.MINUTE_IN_TICKS * 10;
 
-            if (dayTime < rampTimeTicks) {
-                // If in the ramp up period of the day, do a linear scale up
+            if (GameTicks.MINUTE_IN_TICKS * 10 > dayTime) {
+                // During the day, no power
+                outputScale = 0;
+            } else if (GameTicks.MINUTE_IN_TICKS * 10 < dayTime && dayTime < rampTimeTicks) {
+                // If in the ramp up period of the night, do a linear scale up
                 outputScale = dayTime / rampTimeTicks;
-            } else if (dayTime > (GameTicks.MINUTE_IN_TICKS * 10) - (GameTicks.MINUTE_IN_TICKS * rampTimeMinutes)) {
-                // If in the ramp down period of the day, do a linear scale down
-                int timeLeft = (GameTicks.MINUTE_IN_TICKS * 10) - dayTime;
+            } else if (dayTime > (GameTicks.MINUTE_IN_TICKS * 20) - (GameTicks.MINUTE_IN_TICKS * rampTimeMinutes)) {
+                // If in the ramp down period of the night, do a linear scale down
+                int timeLeft = (GameTicks.MINUTE_IN_TICKS * 20) - dayTime;
                 outputScale = timeLeft / rampTimeTicks;
             } else {
-                // Rest of the day, full power
+                // Rest of the night, full power
                 outputScale = 1;
             }
-
-        } else if (night) {
-            return 0;
         }
+        return (int) Math.ceil(outputScale * tier.getProductionRate());
+    }
 
+    public static float getOutputScale(Level level) {
+
+        float outputScale;
+        // A Day night cycle is 20 minutes, daytime is 10 minutes
+        int dayTime = (int) (level.getDayTime() % GameTicks.DAY_IN_TICKS);
+
+        // Over how long should generation scale up/down and the start/end of the day
+        float rampTimeMinutes = 1.5f;
+        float rampTimeTicks = GameTicks.MINUTE_IN_TICKS * rampTimeMinutes;
+
+        if (dayTime < rampTimeTicks) {
+            // If in the ramp up period of the day, do a linear scale up
+            outputScale = dayTime / rampTimeTicks;
+        } else if (dayTime > (GameTicks.MINUTE_IN_TICKS * 10) - (GameTicks.MINUTE_IN_TICKS * rampTimeMinutes)) {
+            // If in the ramp down period of the day, do a linear scale down
+            int timeLeft = (GameTicks.MINUTE_IN_TICKS * 10) - dayTime;
+            outputScale = timeLeft / rampTimeTicks;
+        } else {
+            // Rest of the day, full power
+            outputScale = 1;
+        }
+        outputScale = adjustOutputForWeather(level, outputScale);
+
+        return outputScale;
+    }
+
+    private static float adjustOutputForWeather(Level level, float outputScale) {
         if (level.isThundering()) {
             outputScale -= 0.7f;
         } else if (level.isRaining()) {
             outputScale -= 0.3f;
         }
         outputScale = Math.clamp(outputScale, 0, 1);
-
-        return (int) Math.ceil(outputScale * tier.getProductionRate());
+        return outputScale;
     }
 
     private boolean hasLiquidSunshine() {
         for (Direction direction : Direction.values()) {
             BlockState state = this.level.getBlockState(this.getBlockPos().relative(direction));
             if (state.getFluidState().is(EIOTags.Fluids.SOLAR_PANEL_LIGHT)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasLiquidDarkness() {
+        for (Direction direction : Direction.values()) {
+            BlockState state = this.level.getBlockState(this.getBlockPos().relative(direction));
+            if (state.getFluidState().is(EIOTags.Fluids.SOLAR_PANEL_DARK)) {
                 return true;
             }
         }
@@ -231,14 +276,14 @@ public class SolarPanelBlockEntity extends LegacyPoweredMachineBlockEntity {
 
     @Override
     public void loadAdditional(CompoundTag pTag, HolderLookup.Provider lookupProvider) {
-        entityData = StoredEntityData.parseOptional(lookupProvider, pTag.getCompound(MachineNBTKeys.ENTITY_STORAGE));
+        boundSoul = Soul.parseOptional(lookupProvider, pTag.getCompound(MachineNBTKeys.ENTITY_STORAGE));
 
         super.loadAdditional(pTag, lookupProvider);
     }
 
     @Override
     public void saveAdditional(CompoundTag pTag, HolderLookup.Provider lookupProvider) {
-        pTag.put(MachineNBTKeys.ENTITY_STORAGE, entityData.saveOptional(lookupProvider));
+        pTag.put(MachineNBTKeys.ENTITY_STORAGE, boundSoul.saveOptional(lookupProvider));
 
         super.saveAdditional(pTag, lookupProvider);
     }
@@ -246,24 +291,25 @@ public class SolarPanelBlockEntity extends LegacyPoweredMachineBlockEntity {
     @Override
     protected void applyImplicitComponents(DataComponentInput components) {
         super.applyImplicitComponents(components);
-        entityData = components.getOrDefault(EIODataComponents.STORED_ENTITY, StoredEntityData.EMPTY);
+        boundSoul = components.getOrDefault(EIODataComponents.SOUL, Soul.EMPTY);
     }
 
     @Override
     protected void collectImplicitComponents(DataComponentMap.Builder components) {
         super.collectImplicitComponents(components);
 
-        if (entityData.hasEntity()) {
-            components.set(EIODataComponents.STORED_ENTITY, entityData);
+        if (boundSoul.hasEntity()) {
+            components.set(EIODataComponents.SOUL, boundSoul);
         }
     }
 
-    public Optional<ResourceLocation> getEntityType() {
-        return entityData.entityType();
+    @Nullable
+    public Optional<ResourceLocation> getEntityTypeId() {
+        return boundSoul.isEmpty() ? Optional.empty() : Optional.of(boundSoul.entityTypeId());
     }
 
     public void setEntityType(ResourceLocation entityType) {
-        entityData = StoredEntityData.of(entityType);
+        boundSoul = Soul.of(entityType);
     }
 
     @SubscribeEvent

@@ -16,21 +16,42 @@ apply(from = rootProject.file("buildSrc/shared.gradle.kts"))
 // Mojang ships Java 21 to end users in 1.20.5+, so your mod should target Java 21.
 java.toolchain.languageVersion.set(JavaLanguageVersion.of(21))
 
+configurations {
+    create("gametestAnnotationProcessor") {
+        extendsFrom(annotationProcessor.get())
+    }
+    create("gametestCompileOnly") {
+        extendsFrom(compileOnly.get())
+    }
+    create("gametestImplementation") {
+        extendsFrom(implementation.get())
+    }
+    create("gametestRuntimeOnly") {
+        extendsFrom(runtimeOnly.get())
+    }
+    create("gametestLocalRuntime") {
+        extendsFrom(runtimeOnly.get())
+    }
+}
+
 sourceSets {
     main {
         resources {
             srcDir("src/generated/resources")
         }
     }
+    create("gametest") {
+        compileClasspath += sourceSets.main.get().output
+        runtimeClasspath += configurations.getByName("gametestLocalRuntime")
+    }
 }
 
 val regiliteVersion: String by project
 val jeiMinecraftVersion: String by project
 val jeiVersion: String by project
-val graphlibVersion: String by project
-val graphlibVersionRange: String by project
 val cctMinecraftVersion: String by project
 val cctVersion: String by project
+val jadeFileId: String by project
 
 configurations {
     runtimeClasspath.get().extendsFrom(create("localRuntime"))
@@ -50,22 +71,35 @@ dependencies {
     compileOnly("cc.tweaked:cc-tweaked-$cctMinecraftVersion-core-api:$cctVersion")
     compileOnly("cc.tweaked:cc-tweaked-$cctMinecraftVersion-forge-api:$cctVersion")
 
+    // Jade for addon
+    compileOnly("curse.maven:jade-324717:${jadeFileId}")
+
     // For painting recipe.
     // TODO: This isn't great.
     compileOnly(project(":enderio-machines"))
     add("localRuntime", project(":enderio-machines"))
 
-    api("dev.gigaherz.graph:GraphLib3:$graphlibVersion")
-    jarJar("dev.gigaherz.graph:GraphLib3:$graphlibVersion") {
-        version {
-            strictly(graphlibVersionRange)
-            prefer(graphlibVersion)
-        }
+    // Setup gametests
+    add("gametestImplementation", "net.neoforged:testframework:$neoForgeVersion") {
+        isTransitive = false
     }
+    add("gametestRuntimeOnly", project(":enderio-machines"))
 }
 
 neoForge {
     version = neoForgeVersion
+
+    addModdingDependenciesTo(sourceSets.getByName("gametest"))
+
+    mods {
+        create("enderio_conduits") {
+            sourceSet(sourceSets.getByName("main"))
+        }
+
+        create("enderio_conduits_tests") {
+            sourceSet(sourceSets.getByName("gametest"))
+        }
+    }
 
     runs {
         create("data") {
@@ -78,21 +112,36 @@ neoForge {
                     "--output", file("src/generated/resources").absolutePath,
                     "--existing", file("src/main/resources").absolutePath,
             )
+
+            loadedMods.set(listOf(mods.getByName("enderio_conduits")))
+        }
+
+        create("gameTestServer") {
+            type = "gameTestServer"
+
+            sourceSet = sourceSets.getByName("gametest")
+            loadedMods.set(listOf(mods.getByName("enderio_conduits"), mods.getByName("enderio_conduits_tests")))
         }
     }
+}
 
-    mods {
-        create("endercore") {
-            dependency(project(":endercore"))
-        }
+// Gross hack for gametests for now.
+val minecraftVersionRange: String by project
+val neoForgeVersionRange: String by project
+val loaderVersionRange: String by project
+val replaceProperties = mapOf(
+        "mod_version" to project.version,
+        "mcversion" to minecraftVersionRange,
+        "neo_version" to neoForgeVersionRange,
+        "loader_version_range" to loaderVersionRange
+)
 
-        create("enderio_base") {
-            sourceSet(project(":enderio-base").sourceSets["main"])
-        }
+tasks.withType<ProcessResources>().configureEach {
+    inputs.properties(replaceProperties)
 
-        create("enderio_conduits") {
-            sourceSet(sourceSets.getByName("main"))
-        }
+    filesMatching("META-INF/neoforge.mods.toml") {
+        expand(replaceProperties)
+        expand(mutableMapOf("project" to project))
     }
 }
 

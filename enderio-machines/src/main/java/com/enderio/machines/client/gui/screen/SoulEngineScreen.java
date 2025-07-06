@@ -9,7 +9,6 @@ import com.enderio.machines.client.gui.widget.CapacitorEnergyWidget;
 import com.enderio.machines.client.gui.widget.FluidStackWidget;
 import com.enderio.machines.common.blocks.soul_engine.SoulEngineMenu;
 import com.enderio.machines.common.souldata.EngineSoul;
-import java.util.Optional;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -17,8 +16,11 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.player.Inventory;
 
-public class SoulEngineScreen extends MachineScreen<SoulEngineMenu> {
+import java.text.DecimalFormat;
+import java.util.Optional;
 
+public class SoulEngineScreen extends MachineScreen<SoulEngineMenu> {
+    private static final DecimalFormat FORMAT = new DecimalFormat("0.00");
     public static final ResourceLocation BG_TEXTURE = EnderIO.loc("textures/gui/screen/soul_engine.png");
     private static final int WIDTH = 176;
     private static final int HEIGHT = 166;
@@ -54,26 +56,21 @@ public class SoulEngineScreen extends MachineScreen<SoulEngineMenu> {
 
     @Override
     protected void renderLabels(GuiGraphics guiGraphics, int pMouseX, int pMouseY) {
-        Optional<ResourceLocation> rl = getMenu().getBlockEntity().getEntityType();
-        if (rl.isPresent()) {
-            EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.get(rl.get());
-            if (BuiltInRegistries.ENTITY_TYPE.getKey(type).equals(rl.get())) { // check we don't get the default pig
-                String name = type.getDescription().getString();
-                guiGraphics.drawString(font, name, imageWidth / 2f - font.width(name) / 2f, 10, 4210752, false);
-            } else {
-                guiGraphics.drawString(font, rl.get().toString(),
-                        imageWidth / 2f - font.width(rl.get().toString()) / 2f, 10, 4210752, false);
-            }
-            EngineSoul.SoulData data = EngineSoul.ENGINE.map.get(rl.get());
-            if (data != null) {
+        EntityType<?> entityType = getMenu().getBlockEntity().getEntityType();
+        if (entityType != null) {
+            String name = entityType.getDescription().getString();
+            guiGraphics.drawString(font, name, imageWidth / 2f - font.width(name) / 2f, 10, 4210752, false);
+
+            EngineSoul.ENGINE.matches(entityType).ifPresent(data -> {
                 double burnRate = menu.getBlockEntity().getBurnRate();
                 float genRate = menu.getBlockEntity().getGenerationRate();
-                guiGraphics.drawString(font, data.tickpermb() / burnRate + " t/mb", imageWidth / 2f + 12, 40, 4210752,
+                guiGraphics.drawString(font, FORMAT.format((int) (data.powerpermb() * genRate) * burnRate / data.tickpermb()) + " µI/t", imageWidth / 2f + 12, 40, 4210752,
+                    false);
+                guiGraphics.drawString(font, FORMAT.format(data.tickpermb() / burnRate) + " t/mb", imageWidth / 2f + 12, 50, 4210752,
                         false);
-                guiGraphics.drawString(font, (int) (data.powerpermb() * genRate) + " µI/mb", imageWidth / 2f + 12, 50,
+                guiGraphics.drawString(font, (int) (data.powerpermb() * genRate) + " µI/mb", imageWidth / 2f + 12, 60,
                         4210752, false);
-
-            }
+            });
         }
 
         super.renderLabels(guiGraphics, pMouseX, pMouseY);

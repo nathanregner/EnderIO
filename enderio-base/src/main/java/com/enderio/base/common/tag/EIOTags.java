@@ -4,8 +4,6 @@ import com.enderio.base.api.EnderIO;
 import com.enderio.base.common.block.glass.GlassCollisionPredicate;
 import com.enderio.base.common.block.glass.GlassIdentifier;
 import com.enderio.base.common.block.glass.GlassLighting;
-import java.util.HashMap;
-import java.util.Map;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.BlockTags;
@@ -16,6 +14,9 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.material.Fluid;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public class EIOTags {
 
@@ -33,8 +34,6 @@ public class EIOTags {
         private static void init() {
         }
 
-        // TODO: use these for slot filtering again.
-        public static final TagKey<Item> ENTITY_STORAGE = tag("entity_storage");
         public static final TagKey<Item> GRINDING_BALLS = tag("grinding_balls");
 
         public static final TagKey<Item> HIDE_FACADES = tag("enderio/hide_facades");
@@ -92,8 +91,6 @@ public class EIOTags {
 
         public static final TagKey<Item> SILICON = commonTag("silicon");
         public static final TagKey<Item> GEARS = commonTag("gears");
-        public static final TagKey<Item> GEARS_WOOD = commonTag("gears/wood");
-        public static final TagKey<Item> GEARS_STONE = commonTag("gears/stone");
         public static final TagKey<Item> GEARS_IRON = commonTag("gears/iron");
         public static final TagKey<Item> GEARS_ENERGIZED = commonTag("gears/energized");
         public static final TagKey<Item> GEARS_VIBRANT = commonTag("gears/vibrant");
@@ -119,6 +116,8 @@ public class EIOTags {
 
         public static final TagKey<Item> STORAGE_BLOCKS_QUARTZ = commonTag("storage_blocks/quartz");
         public static final TagKey<Item> STORAGE_BLOCKS_AMETHYST = commonTag("storage_blocks/amethyst");
+
+        public static final TagKey<Item> FERTILIZERS = commonTag("fertilizers");
 
         public static final Map<GlassIdentifier, TagKey<Item>> GLASS_TAGS = createGlassTags();
 
@@ -179,6 +178,7 @@ public class EIOTags {
         public static final TagKey<Fluid> STAFF_OF_LEVITY_FUEL = tag("fluid_fuel/staff_of_levity");
         public static final TagKey<Fluid> EXPERIENCE = commonTag("experience");
         public static final TagKey<Fluid> SOLAR_PANEL_LIGHT = tag("solar_panel_light");
+        public static final TagKey<Fluid> SOLAR_PANEL_DARK = tag("solar_panel_dark");
 
         private static TagKey<Fluid> commonTag(String name) {
             return FluidTags.create(ResourceLocation.fromNamespaceAndPath(COMMON, name));
@@ -193,7 +193,7 @@ public class EIOTags {
         private static void init() {
         }
 
-        public static TagKey<EntityType<?>> SOUL_VIAL_BLACKLIST = tag("soul_vial_blacklist");
+        public static final TagKey<EntityType<?>> SOUL_VIAL_BLACKLIST = tag("soul_vial_blacklist");
 
         private static TagKey<EntityType<?>> tag(String pName) {
             return TagKey.create(Registries.ENTITY_TYPE, EnderIO.loc(pName));

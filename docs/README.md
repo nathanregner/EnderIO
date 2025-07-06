@@ -73,8 +73,9 @@ The Ender IO Team are official Akliz partners! Akliz provides high-performance g
 ### Supported Minecraft Versions
 
 | Minecraft Version | Ender IO Version(s) | Support Status |
-|-------------------| ------------------- | -------------- |
-| 1.21.1            | 7.x                 | ✅             |
+|-------------------|---------------------| -------------- |
+| 1.21.1            | 8.x                 | 🚧             |
+| 1.21.1            | 7.x                 | ❌             |
 | 1.20.1            | 6.x                 | ✳️             |
 | < 1.20.1          | < 6.x               | ❌             |
 
@@ -147,7 +148,7 @@ Certain parts of the source code may be under a different license due to being p
 - EpicSquid
 - Rover656
 - HypherionSA
-- agnor99
+- liliandev
 - ferriarnus
 - dphaldes
 - and our Contributors

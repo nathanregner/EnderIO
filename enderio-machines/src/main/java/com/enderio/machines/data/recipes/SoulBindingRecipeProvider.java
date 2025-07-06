@@ -1,12 +1,16 @@
 package com.enderio.machines.data.recipes;
 
 import com.enderio.base.api.EnderIO;
+import com.enderio.base.api.soul.binding.ingredients.AnySoulBindableIngredient;
 import com.enderio.base.common.init.EIOItems;
 import com.enderio.base.common.tag.EIOTags;
 import com.enderio.machines.common.blockentity.solar.SolarPanelTier;
 import com.enderio.machines.common.blocks.soul_binder.SoulBindingRecipe;
 import com.enderio.machines.common.init.MachineBlocks;
 import com.enderio.machines.common.souldata.EngineSoul;
+import com.enderio.machines.common.souldata.FarmSoul;
+
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import net.minecraft.core.HolderLookup;
@@ -18,9 +22,13 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.ItemLike;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.InfestedBlock;
 import net.neoforged.neoforge.common.Tags;
 
 public class SoulBindingRecipeProvider extends RecipeProvider {
@@ -41,10 +49,12 @@ public class SoulBindingRecipeProvider extends RecipeProvider {
                 recipeOutput);
         build(EIOItems.SENTIENT_ENDER, Ingredient.of(EIOItems.ENDER_RESONATOR), 51200, 4, EntityType.WITCH,
                 recipeOutput);
-        build(EIOItems.BROKEN_SPAWNER, Ingredient.of(EIOItems.BROKEN_SPAWNER), 288000, 8, recipeOutput);
-        build(MachineBlocks.POWERED_SPAWNER, Ingredient.of(MachineBlocks.POWERED_SPAWNER), 288000, 8, true,
+        build(EIOItems.BROKEN_SPAWNER, AnySoulBindableIngredient.of(EIOItems.BROKEN_SPAWNER), 288000, 8, recipeOutput);
+        build(MachineBlocks.POWERED_SPAWNER, AnySoulBindableIngredient.of(MachineBlocks.POWERED_SPAWNER), 288000, 8, true,
                 recipeOutput);
         build(MachineBlocks.SOUL_ENGINE, Ingredient.of(MachineBlocks.SOUL_ENGINE), 188000, 5, EngineSoul.NAME,
+                recipeOutput);
+        build(MachineBlocks.FARMING_STATION, Ingredient.of(MachineBlocks.FARMING_STATION), 188000, 5, FarmSoul.NAME,
                 recipeOutput);
         build(EIOItems.PLAYER_TOKEN, Ingredient.of(EIOItems.DARK_STEEL_BALL), 12800, 1, EntityType.VILLAGER,
                 recipeOutput);
@@ -62,6 +72,11 @@ public class SoulBindingRecipeProvider extends RecipeProvider {
                 Ingredient.of(MachineBlocks.SOLAR_PANELS.get(SolarPanelTier.VIBRANT)), 288000, 14, EntityType.PHANTOM,
                 recipeOutput);
 
+        InfestedBlock.BLOCK_BY_HOST_BLOCK.forEach((original, infested) -> buildInfested(infested, original, recipeOutput));
+    }
+
+    protected void buildInfested(ItemLike infestedItem, ItemLike original, RecipeOutput recipeOutput) {
+        build(infestedItem, Ingredient.of(original), 10000, 0, EntityType.SILVERFISH, recipeOutput);
     }
 
     protected void build(ItemLike output, Ingredient input, int energy, int exp,

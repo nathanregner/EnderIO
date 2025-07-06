@@ -1,11 +1,12 @@
 package com.enderio.machines.common.blocks.soul_engine;
 
-import com.enderio.base.api.attachment.StoredEntityData;
+import com.enderio.base.api.soul.Soul;
 import com.enderio.base.api.capacitor.CapacitorModifier;
 import com.enderio.base.api.capacitor.FixedScalable;
 import com.enderio.base.api.capacitor.LinearScalable;
 import com.enderio.base.api.capacitor.QuadraticScalable;
 import com.enderio.base.api.io.energy.EnergyIOMode;
+import com.enderio.base.api.soul.binding.ISoulBindable;
 import com.enderio.base.common.init.EIODataComponents;
 import com.enderio.machines.EnderIOMachines;
 import com.enderio.machines.common.MachineNBTKeys;
@@ -21,6 +22,8 @@ import com.enderio.machines.common.io.fluid.MachineFluidTank;
 import com.enderio.machines.common.io.fluid.MachineTankLayout;
 import com.enderio.machines.common.io.fluid.TankAccess;
 import com.enderio.machines.common.souldata.EngineSoul;
+
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Predicate;
 import net.minecraft.core.BlockPos;
@@ -33,6 +36,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -50,7 +54,7 @@ import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import org.jetbrains.annotations.Nullable;
 
 @EventBusSubscriber(modid = EnderIOMachines.MODULE_MOD_ID)
-public class SoulEngineBlockEntity extends PoweredMachineBlockEntity implements FluidTankUser {
+public class SoulEngineBlockEntity extends PoweredMachineBlockEntity implements FluidTankUser, ISoulBindable {
 
     private static final QuadraticScalable CAPACITY = new QuadraticScalable(CapacitorModifier.ENERGY_CAPACITY,
             MachinesConfig.COMMON.ENERGY.SOUL_ENGINE_CAPACITY);
@@ -60,7 +64,7 @@ public class SoulEngineBlockEntity extends PoweredMachineBlockEntity implements 
     public static final LinearScalable GENERATION_SPEED = new LinearScalable(CapacitorModifier.FIXED, () -> 1);
 
     private static final String BURNED_TICKS = "BurnedTicks";
-    private StoredEntityData entityData = StoredEntityData.EMPTY;
+    private Soul boundSoul = Soul.EMPTY;
     public static final int FLUID_CAPACITY = 2 * FluidType.BUCKET_VOLUME;
     private final MachineFluidHandler fluidHandler;
     private static final TankAccess TANK = new TankAccess();
@@ -83,11 +87,12 @@ public class SoulEngineBlockEntity extends PoweredMachineBlockEntity implements 
 
     @Override
     public void serverTick() {
-        if (reloadCache != reload && entityData.hasEntity()) {
-            Optional<EngineSoul.SoulData> op = EngineSoul.ENGINE.matches(entityData.entityType().get());
+        if (reloadCache != reload && boundSoul.hasEntity()) {
+            Optional<EngineSoul.SoulData> op = EngineSoul.ENGINE.matches(boundSoul.entityType());
             op.ifPresent(data -> soulData = data);
             reloadCache = reload;
         }
+
         if (soulData != null && isActive()) {
             producePower();
         }
@@ -98,16 +103,34 @@ public class SoulEngineBlockEntity extends PoweredMachineBlockEntity implements 
                             && isCapacitorInstalled());
         }
 
-        updateMachineState(MachineState.NOT_SOULBOUND, soulData == null || entityData.entityType().isEmpty());
+        updateMachineState(MachineState.NOT_SOULBOUND, soulData == null || boundSoul.entityType() != null);
         super.serverTick();
     }
 
-    public Optional<ResourceLocation> getEntityType() {
-        return entityData.entityType();
+    @Nullable
+    public EntityType<?> getEntityType() {
+        return boundSoul.hasEntity() ? boundSoul.entityType() : null;
     }
 
-    public void setEntityType(ResourceLocation entityType) {
-        entityData = StoredEntityData.of(entityType);
+    @Override
+    public Soul getBoundSoul() {
+        return boundSoul;
+    }
+
+    @Override
+    public boolean canBind() {
+        return true;
+    }
+
+    @Override
+    public boolean isSoulValid(Soul soul) {
+        return EngineSoul.ENGINE.matches(soul.entityTypeId()).isPresent();
+    }
+
+    @Override
+    public void bindSoul(Soul newSoul) {
+        this.boundSoul = newSoul;
+        this.soulData = EngineSoul.ENGINE.matches(newSoul.entityTypeId()).get();
     }
 
     @Override
@@ -215,14 +238,14 @@ public class SoulEngineBlockEntity extends PoweredMachineBlockEntity implements 
     @Override
     protected void saveAdditionalSynced(CompoundTag tag, HolderLookup.Provider registries) {
         super.saveAdditionalSynced(tag, registries);
-        tag.put(MachineNBTKeys.ENTITY_STORAGE, entityData.saveOptional(registries));
+        tag.put(MachineNBTKeys.ENTITY_STORAGE, boundSoul.saveOptional(registries));
     }
 
     @Override
     public void loadAdditional(CompoundTag pTag, HolderLookup.Provider lookupProvider) {
         super.loadAdditional(pTag, lookupProvider);
         burnedTicks = pTag.getInt(BURNED_TICKS);
-        entityData = StoredEntityData.parseOptional(lookupProvider, pTag.getCompound(MachineNBTKeys.ENTITY_STORAGE));
+        boundSoul = Soul.parseOptional(lookupProvider, pTag.getCompound(MachineNBTKeys.ENTITY_STORAGE));
 
         updateMachineState(MachineState.NO_POWER, false);
         updateMachineState(MachineState.FULL_POWER,
@@ -234,7 +257,7 @@ public class SoulEngineBlockEntity extends PoweredMachineBlockEntity implements 
     @Override
     protected void applyImplicitComponents(DataComponentInput components) {
         super.applyImplicitComponents(components);
-        entityData = components.getOrDefault(EIODataComponents.STORED_ENTITY, StoredEntityData.EMPTY);
+        boundSoul = components.getOrDefault(EIODataComponents.SOUL, Soul.EMPTY);
 
         SimpleFluidContent storedFluid = components.get(EIODataComponents.ITEM_FLUID_CONTENT);
         if (storedFluid != null) {
@@ -247,8 +270,8 @@ public class SoulEngineBlockEntity extends PoweredMachineBlockEntity implements 
     protected void collectImplicitComponents(DataComponentMap.Builder components) {
         super.collectImplicitComponents(components);
 
-        if (entityData.hasEntity()) {
-            components.set(EIODataComponents.STORED_ENTITY, entityData);
+        if (boundSoul.hasEntity()) {
+            components.set(EIODataComponents.SOUL, boundSoul);
         }
 
         var tank = TANK.getTank(this);

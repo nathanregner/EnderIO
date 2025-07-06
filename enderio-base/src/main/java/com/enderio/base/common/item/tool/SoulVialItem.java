@@ -1,7 +1,9 @@
 package com.enderio.base.common.item.tool;
 
 import com.enderio.EnderIOBase;
-import com.enderio.base.api.attachment.StoredEntityData;
+import com.enderio.base.api.EnderIO;
+import com.enderio.base.api.soul.Soul;
+import com.enderio.base.api.soul.SoulBoundUtils;
 import com.enderio.base.common.init.EIODataComponents;
 import com.enderio.base.common.init.EIOItems;
 import com.enderio.base.common.lang.EIOLang;
@@ -12,6 +14,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.dispenser.BlockSource;
 import net.minecraft.core.dispenser.OptionalDispenseItemBehavior;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
@@ -22,7 +25,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.animal.Wolf;
-import net.minecraft.world.entity.animal.horse.AbstractChestedHorse;
+import net.minecraft.world.entity.animal.horse.AbstractHorse;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.npc.WanderingTrader;
 import net.minecraft.world.entity.player.Player;
@@ -35,8 +38,6 @@ import net.minecraft.world.phys.AABB;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.neoforged.neoforge.capabilities.Capabilities;
-import net.neoforged.neoforge.capabilities.ICapabilityProvider;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import org.jetbrains.annotations.Nullable;
 
@@ -49,27 +50,57 @@ import java.util.function.Consumer;
 @EventBusSubscriber(modid = EnderIOBase.MODULE_MOD_ID)
 public class SoulVialItem extends Item implements AdvancedTooltipProvider {
 
-    public static final ICapabilityProvider<ItemStack, Void, StoredEntityData> STORED_ENTITY_PROVIDER
-        = (stack, ctx) -> stack.get(EIODataComponents.STORED_ENTITY);
+    public static final ResourceLocation FILLED_MODEL_PROPERTY = EnderIO.loc("soul_vial_filled");
+
+    /**
+     * Should match key from {@link LivingEntity#addAdditionalSaveData(CompoundTag)}
+     */
+    public static final String KEY_HEALTH = "Health";
 
     public SoulVialItem(Properties pProperties) {
         super(pProperties);
+    }
+
+    public static ItemStack forSoul(Soul soul) {
+        ItemStack soulVial = new ItemStack(EIOItems.SOUL_VIAL.get());
+        soulVial.set(EIODataComponents.SOUL, soul);
+        return soulVial;
     }
 
     // Item appearance and description
 
     @Override
     public boolean isFoil(ItemStack pStack) {
-        return pStack.getOrDefault(EIODataComponents.STORED_ENTITY, StoredEntityData.EMPTY).hasEntity();
+        return pStack.getOrDefault(EIODataComponents.SOUL, Soul.EMPTY).hasEntity();
+    }
+
+    @Override
+    public void addCommonTooltips(ItemStack itemStack, @Nullable Player player, List<Component> tooltips) {
+        // Add entity name
+        var soul = itemStack.getOrDefault(EIODataComponents.SOUL, Soul.EMPTY);
+        if (!soul.isEmpty()) {
+            tooltips.add(TooltipUtil.style(Component.translatable(soul.entityType().getDescriptionId())));
+        }
     }
 
     @Override
     public void addDetailedTooltips(ItemStack itemStack, @Nullable Player player, List<Component> tooltips) {
-        itemStack
-            .getOrDefault(EIODataComponents.STORED_ENTITY, StoredEntityData.EMPTY)
-            .getHealthState()
-            .ifPresent(health ->
-                tooltips.add(TooltipUtil.styledWithArgs(EIOLang.SOUL_VIAL_TOOLTIP_HEALTH, health.getA(), health.getB())));
+        var soul = itemStack.getOrDefault(EIODataComponents.SOUL, Soul.EMPTY);
+        if (soul.isEmpty()) {
+            return;
+        }
+
+        // Try add entity health
+        float maxHealth = itemStack.getOrDefault(EIODataComponents.ENTITY_MAX_HEALTH, 0f);
+        if (maxHealth <= 0) {
+            return;
+        }
+
+        var entityTag = soul.getEntityTag();
+        if (entityTag.contains(KEY_HEALTH)) {
+            float health = entityTag.getFloat(KEY_HEALTH);
+            tooltips.add(TooltipUtil.styledWithArgs(EIOLang.SOUL_VIAL_TOOLTIP_HEALTH, health, maxHealth));
+        }
     }
 
     // endregion
@@ -77,16 +108,20 @@ public class SoulVialItem extends Item implements AdvancedTooltipProvider {
     // region Interactions
 
     @Override
-    public InteractionResult interactLivingEntity(ItemStack pStack, Player pPlayer, LivingEntity pInteractionTarget, InteractionHand pUsedHand) {
+    public InteractionResult interactLivingEntity(ItemStack pStack, Player pPlayer, LivingEntity pInteractionTarget,
+            InteractionHand pUsedHand) {
         if (pPlayer.level().isClientSide) {
             return InteractionResult.FAIL;
         }
-        Optional<ItemStack> itemStack = catchEntity(pStack, pInteractionTarget, component -> pPlayer.displayClientMessage(component, true));
+
+        Optional<ItemStack> itemStack = catchEntity(pStack, pInteractionTarget,
+                component -> pPlayer.displayClientMessage(component, true));
         if (itemStack.isPresent()) {
             ItemStack filledVial = itemStack.get();
             ItemStack hand = pPlayer.getItemInHand(pUsedHand);
             if (hand.isEmpty()) {
-                hand.setCount(1); // Forge will fire the destroyItemEvent and vanilla replaces it to ItemStack.EMPTY if this isn't done
+                hand.setCount(1); // Forge will fire the destroyItemEvent and vanilla replaces it to
+                                  // ItemStack.EMPTY if this isn't done
                 pPlayer.setItemInHand(pUsedHand, filledVial);
             } else {
                 if (!pPlayer.addItem(filledVial)) {
@@ -110,29 +145,25 @@ public class SoulVialItem extends Item implements AdvancedTooltipProvider {
         if (player == null) {
             return InteractionResult.FAIL;
         }
-        return releaseEntity(pContext.getLevel(), pContext.getItemInHand(), pContext.getClickedFace(), pContext.getClickedPos(),
-            emptyVial -> player.setItemInHand(pContext.getHand(), emptyVial));
+
+        return releaseEntity(pContext.getLevel(), pContext.getItemInHand(), pContext.getClickedFace(),
+                pContext.getClickedPos(), emptyVial -> player.setItemInHand(pContext.getHand(), emptyVial));
     }
 
     /**
      * @return the filled vial
      */
-    private static Optional<ItemStack> catchEntity(ItemStack soulVial, LivingEntity entity, Consumer<Component> displayCallback) {
+    private static Optional<ItemStack> catchEntity(ItemStack soulVial, LivingEntity entity,
+            Consumer<Component> displayCallback) {
 
-        //Soul Vial is filled, so it can't capture
-        Optional<StoredEntityData> entityData = getEntityData(soulVial);
-        if (entityData.isPresent() && entityData.get().hasEntity()) {
+        // Soul Vial is filled, so it can't capture
+        Soul soul = soulVial.getOrDefault(EIODataComponents.SOUL, Soul.EMPTY);
+        if (soul.hasEntity()) {
             return Optional.empty();
         }
-        
+
         if (entity instanceof Player) {
             displayCallback.accept(EIOLang.SOUL_VIAL_ERROR_PLAYER);
-            return Optional.empty();
-        }
-
-        EntityCaptureUtils.CapturableStatus status = EntityCaptureUtils.getCapturableStatus((EntityType<? extends LivingEntity>) entity.getType(), entity);
-        if (status != EntityCaptureUtils.CapturableStatus.CAPTURABLE) {
-            displayCallback.accept(status.errorMessage());
             return Optional.empty();
         }
 
@@ -140,23 +171,38 @@ public class SoulVialItem extends Item implements AdvancedTooltipProvider {
             displayCallback.accept(EIOLang.SOUL_VIAL_ERROR_DEAD);
             return Optional.empty();
         }
+
+        //noinspection unchecked
+        EntityCaptureUtils.CapturableStatus status = EntityCaptureUtils
+                .getCapturableStatus((EntityType<? extends LivingEntity>) entity.getType(), entity);
+        if (status != EntityCaptureUtils.CapturableStatus.CAPTURABLE) {
+            displayCallback.accept(status.errorMessage());
+            return Optional.empty();
+        }
+
         // Create a filled vial and put the entity's NBT inside.
         if (entity instanceof Mob mob && mob.getLeashHolder() != null) {
             mob.dropLeash(true, true);
         }
+
+        // Create the filled vial
+        ItemStack filledVial = soulVial.copyWithCount(1);
+        filledVial.set(EIODataComponents.SOUL, Soul.of(entity));
+        filledVial.set(EIODataComponents.ENTITY_MAX_HEALTH, entity.getMaxHealth());
+
+        // Consume the stack
         soulVial.shrink(1);
-        ItemStack filledVial = EIOItems.FILLED_SOUL_VIAL.get().getDefaultInstance();
-        setEntityData(filledVial, entity);
 
         // Remove the captured mob.
         entity.discard();
         return Optional.of(filledVial);
     }
 
-    private static InteractionResult releaseEntity(Level level, ItemStack filledVial, Direction face, BlockPos pos, Consumer<ItemStack> emptyVialSetter) {
-        var storedEntity = filledVial.get(EIODataComponents.STORED_ENTITY);
+    private static InteractionResult releaseEntity(Level level, ItemStack filledVial, Direction face, BlockPos pos,
+            Consumer<ItemStack> emptyVialSetter) {
+        var storedSoul = filledVial.get(EIODataComponents.SOUL);
 
-        if (storedEntity != null && storedEntity.hasEntity()) {
+        if (storedSoul != null && storedSoul.hasEntity()) {
             // Get the spawn location for the mob.
             double spawnX = pos.getX() + face.getStepX() + 0.5;
             double spawnY = pos.getY() + face.getStepY();
@@ -166,7 +212,7 @@ public class SoulVialItem extends Item implements AdvancedTooltipProvider {
             float rotation = Mth.wrapDegrees(level.getRandom().nextFloat() * 360.0f);
 
             // Try to get the entity NBT from the item.
-            Optional<Entity> entity = EntityType.create(storedEntity.getEntityTag(), level);
+            Optional<Entity> entity = EntityType.create(storedSoul.getEntityTag(), level);
 
             // Position the entity and add it.
             entity.ifPresent(ent -> {
@@ -174,7 +220,7 @@ public class SoulVialItem extends Item implements AdvancedTooltipProvider {
                 ent.setYRot(rotation);
                 level.addFreshEntity(ent);
             });
-            emptyVialSetter.accept(EIOItems.EMPTY_SOUL_VIAL.get().getDefaultInstance());
+            emptyVialSetter.accept(EIOItems.SOUL_VIAL.get().getDefaultInstance());
         }
 
         return InteractionResult.SUCCESS;
@@ -186,28 +232,10 @@ public class SoulVialItem extends Item implements AdvancedTooltipProvider {
 
     public static List<ItemStack> getAllFilled() {
         List<ItemStack> items = new ArrayList<>();
-        for (ResourceLocation entity : EntityCaptureUtils.getCapturableEntities()) {
-            ItemStack is = EIOItems.FILLED_SOUL_VIAL.get().getDefaultInstance();
-            setEntityType(is, entity);
-            items.add(is);
+        for (var entityType : EntityCaptureUtils.getCapturableEntityTypes()) {
+            items.add(forSoul(Soul.of(entityType)));
         }
         return items;
-    }
-
-    // endregion
-
-    // region Entity Storage
-
-    public static void setEntityType(ItemStack stack, ResourceLocation entityType) {
-        stack.set(EIODataComponents.STORED_ENTITY, StoredEntityData.of(entityType));
-    }
-
-    private static void setEntityData(ItemStack stack, LivingEntity entity) {
-        stack.set(EIODataComponents.STORED_ENTITY, StoredEntityData.of(entity));
-    }
-
-    public static Optional<StoredEntityData> getEntityData(ItemStack stack) {
-        return Optional.ofNullable(stack.get(EIODataComponents.STORED_ENTITY));
     }
 
     // endregion
@@ -227,8 +255,15 @@ public class SoulVialItem extends Item implements AdvancedTooltipProvider {
     @SubscribeEvent
     public static void onLivingInteract(PlayerInteractEvent.EntityInteractSpecific event) {
         ItemStack stack = event.getItemStack();
-        if (stack.is(EIOItems.EMPTY_SOUL_VIAL.get())) {
-            if (event.getTarget() instanceof AbstractChestedHorse || event.getTarget() instanceof Villager || event.getTarget() instanceof WanderingTrader || event.getTarget() instanceof Wolf) {
+
+        // Use a copy of the stack if we're in creative.
+        if (event.getEntity().getAbilities().instabuild) {
+            stack = stack.copy();
+        }
+
+        if (stack.is(EIOItems.SOUL_VIAL.get())) {
+            if (event.getTarget() instanceof AbstractHorse || event.getTarget() instanceof Villager
+                    || event.getTarget() instanceof WanderingTrader || event.getTarget() instanceof Wolf) {
                 stack.interactLivingEntity(event.getEntity(), (LivingEntity) event.getTarget(), event.getHand());
             }
         }
@@ -236,36 +271,25 @@ public class SoulVialItem extends Item implements AdvancedTooltipProvider {
 
     public static void onCommonSetup(FMLCommonSetupEvent event) {
         event.enqueueWork(() -> {
-            DispenserBlock.registerBehavior(EIOItems.FILLED_SOUL_VIAL.get(), new EmptySoulVialDispenseBehavior());
-            DispenserBlock.registerBehavior(EIOItems.EMPTY_SOUL_VIAL.get(), new FillSoulVialDispenseBehavior());
+            DispenserBlock.registerBehavior(EIOItems.SOUL_VIAL.get(), new SoulVialDispenseBehavior());
         });
     }
 
     // endregion
 
     // region Dispenser
-    private static class FillSoulVialDispenseBehavior extends OptionalDispenseItemBehavior {
+
+    private static class SoulVialDispenseBehavior extends OptionalDispenseItemBehavior {
         @Override
         protected ItemStack execute(BlockSource source, ItemStack stack) {
-            BlockPos blockpos = source.pos().relative(source.state().getValue(DispenserBlock.FACING));
-            for (LivingEntity livingentity : source
-                    .level()
-                    .getEntitiesOfClass(LivingEntity.class, new AABB(blockpos), living -> !(living instanceof Player))) {
-
-                // Copy, consumeWithRemainder will shrink the stack.
-                Optional<ItemStack> filledVial = catchEntity(stack.copy(), livingentity, component -> {});
-                if (filledVial.isPresent()) {
-                    return this.consumeWithRemainder(source, stack, filledVial.get());
-                }
+            if (SoulBoundUtils.isBound(stack)) {
+                return release(source, stack);
+            } else {
+                return capture(source, stack);
             }
-
-            this.setSuccess(false);
-            return stack;
         }
-    }
 
-    private static class EmptySoulVialDispenseBehavior extends OptionalDispenseItemBehavior {
-        protected ItemStack execute(BlockSource source, ItemStack stack) {
+        private ItemStack release(BlockSource source, ItemStack stack) {
             Direction dispenserDirection = source.state().getValue(DispenserBlock.FACING);
             AtomicReference<ItemStack> emptyVial = new AtomicReference<>();
             releaseEntity(source.level(), stack, dispenserDirection, source.pos(), emptyVial::set);
@@ -275,6 +299,24 @@ public class SoulVialItem extends Item implements AdvancedTooltipProvider {
                 this.setSuccess(false);
                 return stack;
             }
+        }
+
+        private ItemStack capture(BlockSource source, ItemStack stack) {
+            BlockPos blockpos = source.pos().relative(source.state().getValue(DispenserBlock.FACING));
+            for (LivingEntity livingentity : source.level()
+                .getEntitiesOfClass(LivingEntity.class, new AABB(blockpos),
+                    living -> !(living instanceof Player))) {
+
+                // Copy, consumeWithRemainder will shrink the stack.
+                Optional<ItemStack> filledVial = catchEntity(stack.copy(), livingentity, component -> {
+                });
+                if (filledVial.isPresent()) {
+                    return this.consumeWithRemainder(source, stack, filledVial.get());
+                }
+            }
+
+            this.setSuccess(false);
+            return stack;
         }
     }
 

@@ -1,7 +1,6 @@
 package com.enderio.base.common.item.tool;
 
 import com.enderio.base.api.capability.SideConfig;
-import com.enderio.base.common.blockentity.Wrenchable;
 import com.enderio.base.common.init.EIOCapabilities;
 import com.mojang.datafixers.util.Either;
 import java.util.Optional;
@@ -28,10 +27,6 @@ public class YetaWrenchItem extends Item {
     public InteractionResult onItemUseFirst(ItemStack stack, UseOnContext pContext) {
         Level level = pContext.getLevel();
         BlockPos pos = pContext.getClickedPos();
-
-        if (!level.isClientSide && level.getBlockEntity(pos) instanceof Wrenchable wrenchable) {
-            return wrenchable.onWrenched(pContext.getPlayer(), pContext.getClickedFace()).result();
-        }
 
         // Check for side config capability
         SideConfig sideConfig = level.getCapability(EIOCapabilities.SideConfig.BLOCK, pos, pContext.getClickedFace());
@@ -76,20 +71,14 @@ public class YetaWrenchItem extends Item {
 
     private static BlockState getNextState(UseOnContext pContext, BlockState state,
             Either<DirectionProperty, EnumProperty<Direction.Axis>> property) {
-        return handleProperties(pContext, state, property.left(), property.right());
-    }
 
-    private static BlockState handleProperties(UseOnContext pContext, BlockState state,
-            Optional<DirectionProperty> directionProperty, Optional<EnumProperty<Direction.Axis>> axisProperty) {
-        if (directionProperty.isPresent()) {
-            return handleProperty(pContext, state, directionProperty.get());
+        if (property.left().isPresent()) {
+            return handleProperty(pContext, state, property.left().get());
+        } else if (property.right().isPresent()) {
+            return handleProperty(pContext, state, property.right().get());
+        } else {
+            throw new IllegalArgumentException("property must either be a Direction or Axis property.");
         }
-
-        if (axisProperty.isPresent()) {
-            return handleProperty(pContext, state, axisProperty.get());
-        }
-
-        throw new IllegalArgumentException("At least one Optional should be set");
     }
 
     private static <T extends Comparable<T>> BlockState handleProperty(UseOnContext pContext, BlockState state,

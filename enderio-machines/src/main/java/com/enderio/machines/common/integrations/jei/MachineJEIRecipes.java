@@ -2,6 +2,7 @@ package com.enderio.machines.common.integrations.jei;
 
 import com.enderio.machines.common.blocks.alloy.AlloySmeltingRecipe;
 import com.enderio.machines.common.blocks.fluid_tank.TankRecipe;
+import com.enderio.machines.common.blocks.obelisks.weather.WeatherChangeRecipe;
 import com.enderio.machines.common.blocks.sag_mill.SagMillingRecipe;
 import com.enderio.machines.common.blocks.slicer.SlicingRecipe;
 import com.enderio.machines.common.blocks.soul_binder.SoulBindingRecipe;
@@ -28,15 +29,6 @@ public class MachineJEIRecipes {
     }
 
     public List<RecipeHolder<AlloySmeltingRecipe>> getAlloySmeltingRecipes() {
-        var recipes = recipeManager.getAllRecipesFor(MachineRecipes.ALLOY_SMELTING.type().get())
-                .stream()
-                .filter(recipe -> !recipe.value().isSmelting())
-                .toList();
-
-        return recipes;
-    }
-
-    public List<RecipeHolder<AlloySmeltingRecipe>> getAlloySmeltingRecipesWithSmelting() {
         List<RecipeHolder<AlloySmeltingRecipe>> recipes = new ArrayList<>();
         recipes.addAll(recipeManager.getAllRecipesFor(MachineRecipes.ALLOY_SMELTING.type().get()));
         return recipes;
@@ -75,5 +67,9 @@ public class MachineJEIRecipes {
 
     public List<RecipeHolder<FermentingRecipe>> getVATRecipes() {
         return recipeManager.getAllRecipesFor(MachineRecipes.VAT_FERMENTING.type().get());
+    }
+
+    public List<RecipeHolder<WeatherChangeRecipe>> getWeatherRecipes() {
+        return recipeManager.getAllRecipesFor(MachineRecipes.WEATHER_CHANGE.type().get());
     }
 }

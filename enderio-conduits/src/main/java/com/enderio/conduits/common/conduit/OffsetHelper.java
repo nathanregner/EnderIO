@@ -1,6 +1,7 @@
 package com.enderio.conduits.common.conduit;
 
 import com.enderio.base.common.util.ThrowableUtil;
+import com.enderio.conduits.api.bundle.ConduitBundle;
 import com.mojang.logging.LogUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -42,7 +43,7 @@ public class OffsetHelper {
      *  738
      */
 
-    public static Map<Integer, Vector2i> positions = Util.make(() -> {
+    public static final Map<Integer, Vector2i> positions = Util.make(() -> {
         Map<Integer, Vector2i> positions = new HashMap<>();
         positions.put(1, new Vector2i(0, -1));
         positions.put(2, new Vector2i(-1, 0));

@@ -1,87 +1,61 @@
 package com.enderio.conduits.common.conduit.type.redstone;
 
-import com.enderio.conduits.api.ColoredRedstoneProvider;
-import com.enderio.conduits.api.ConduitNetwork;
-import com.enderio.conduits.api.ConduitNode;
-import com.enderio.conduits.api.ticker.IOAwareConduitTicker;
+import com.enderio.conduits.api.ConduitCapabilities;
+import com.enderio.conduits.api.network.IConduitNetwork;
+import com.enderio.conduits.api.ticker.ConduitTicker;
 import com.enderio.conduits.common.init.ConduitBlocks;
-import com.enderio.conduits.common.init.ConduitTypes;
-import com.enderio.conduits.common.redstone.RedstoneExtractFilter;
-import com.enderio.conduits.common.tag.ConduitTags;
-import java.util.Collection;
-import java.util.EnumMap;
-import java.util.List;
-import java.util.Map;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.item.DyeColor;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
 
-public class RedstoneConduitTicker implements IOAwareConduitTicker<RedstoneConduit> {
+public class RedstoneConduitTicker implements ConduitTicker<RedstoneConduit> {
 
-    private final Map<DyeColor, Integer> activeColors = new EnumMap<>(DyeColor.class);
+    public static final RedstoneConduitTicker INSTANCE = new RedstoneConduitTicker();
 
     @Override
-    public boolean canConnectTo(Level level, BlockPos conduitPos, Direction direction) {
-        BlockPos neighbor = conduitPos.relative(direction);
-        BlockState blockState = level.getBlockState(neighbor);
-        return blockState.is(ConduitTags.Blocks.REDSTONE_CONNECTABLE)
-                || blockState.canRedstoneConnectTo(level, neighbor, direction);
-    }
+    public void tick(ServerLevel level, RedstoneConduit conduit, IConduitNetwork network) {
+        var context = network.getOrCreateContext(RedstoneConduitNetworkContext.TYPE);
+        boolean isActiveBeforeTick = context.isActive();
+        context.nextTick();
 
-    @Override
-    public boolean canForceConnectTo(Level level, BlockPos conduitPos, Direction direction) {
-        BlockPos neighbor = conduitPos.relative(direction);
-        BlockState blockState = level.getBlockState(neighbor);
-        return !blockState.isAir();
-    }
+        for (var channel : network.allChannels()) {
+            // Receive input signals.
+            for (var extractConnection : network.extractConnections(channel)) {
+                int signal;
 
-    @Override
-    public void tickGraph(ServerLevel level, RedstoneConduit conduit, ConduitNetwork graph,
-            ColoredRedstoneProvider coloredRedstoneProvider) {
+                var redstoneExtractFilter = extractConnection.inventory()
+                        .getStackInSlot(RedstoneConduit.EXTRACT_FILTER_SLOT)
+                        .getCapability(ConduitCapabilities.REDSTONE_EXTRACT_FILTER);
 
-        Collection<ConduitNode> nodeIdentifiers = graph.getNodes();
+                if (redstoneExtractFilter != null) {
+                    signal = redstoneExtractFilter.getInputSignal(level, extractConnection.connectedBlockPos(),
+                            extractConnection.connectionSide());
+                } else {
+                    signal = level.getSignal(extractConnection.connectedBlockPos(), extractConnection.connectionSide());
+                }
 
-        activeColors.clear();
-        tickGraph(level, conduit, nodeIdentifiers.stream().filter(node -> isLoaded(level, node.getPos())).toList(),
-                graph, coloredRedstoneProvider);
+                if (signal > 0) {
+                    context.setSignal(channel, signal);
+                }
+            }
 
-        for (var nodeIdentifier : nodeIdentifiers) {
-            RedstoneConduitData data = nodeIdentifier.getOrCreateData(ConduitTypes.Data.REDSTONE.get());
-            data.clearActive();
-            for (var entry : activeColors.entrySet()) {
-                data.setActiveColor(entry.getKey(), entry.getValue());
+            // Fire block updates if the signal changed.
+            if (context.isNew() || context.getSignal(channel) != context.getSignalLastTick(channel)) {
+
+                for (var insertConnection : network.insertConnections(channel)) {
+                    level.updateNeighborsAt(insertConnection.node().pos(), ConduitBlocks.CONDUIT.get());
+
+                    if (insertConnection.connectionConfig(RedstoneConduitConnectionConfig.TYPE).isStrongOutputSignal()) {
+                        level.updateNeighborsAt(insertConnection.connectedBlockPos(), ConduitBlocks.CONDUIT.get());
+                    }
+                }
+            }
+        }
+
+        // Mark all nodes as dirty if the active state changes (update block models).
+        if (context.isNew() || context.isActive() != isActiveBeforeTick) {
+            for (var node : network.tickingNodes()) {
+                node.markDirty();
             }
         }
     }
 
-    @Override
-    public void tickColoredGraph(ServerLevel level, RedstoneConduit conduit, List<Connection> inserts,
-            List<Connection> extracts, DyeColor color, ConduitNetwork graph,
-            ColoredRedstoneProvider coloredRedstoneProvider) {
-
-        for (Connection extract : extracts) {
-            int signal;
-            if (extract.extractFilter() instanceof RedstoneExtractFilter filter) {
-                signal = filter.getInputSignal(level, extract.move(), extract.direction());
-            } else {
-                signal = level.getSignal(extract.move(), extract.direction());
-            }
-
-            if (signal > 0) {
-                activeColors.put(color, Math.max(activeColors.getOrDefault(color, 0), signal));
-            }
-        }
-
-        for (Connection insert : inserts) {
-            level.neighborChanged(insert.move(), ConduitBlocks.CONDUIT.get(), insert.pos());
-        }
-    }
-
-    @Override
-    public boolean shouldSkipColor(List<Connection> extractList, List<Connection> insertList) {
-        return extractList.isEmpty() && insertList.isEmpty(); // Only skip if no one uses the channel
-    }
 }

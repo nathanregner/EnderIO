@@ -26,7 +26,8 @@ import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.ItemLike;
 import net.neoforged.neoforge.common.Tags;
 import net.neoforged.neoforge.common.conditions.ModLoadedCondition;
-import net.neoforged.neoforge.common.crafting.SizedIngredient;
+
+import java.util.concurrent.CompletableFuture;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -43,7 +44,8 @@ public class ConduitRecipes extends RecipeProvider {
     protected void buildRecipes(RecipeOutput recipeOutput) {
         // We know that the registries are now available.
         HolderLookup.Provider lookupProvider = registries.resultNow();
-        HolderGetter<Conduit<?>> conduitRegistry = lookupProvider.lookupOrThrow(EnderIOConduitsRegistries.Keys.CONDUIT);
+        HolderGetter<Conduit<?, ?>> conduitRegistry = lookupProvider
+                .lookupOrThrow(EnderIOConduitsRegistries.Keys.CONDUIT);
 
         var itemConduit = conduitRegistry.getOrThrow(Conduits.ITEM);
         var fluidConduit = conduitRegistry.getOrThrow(Conduits.FLUID);
@@ -54,7 +56,6 @@ public class ConduitRecipes extends RecipeProvider {
         var enderEnergyConduit = conduitRegistry.getOrThrow(Conduits.ENDER_ENERGY);
         var redstoneConduit = conduitRegistry.getOrThrow(Conduits.REDSTONE);
 
-        buildUpgradeRecipes(recipeOutput);
         buildFilterRecipes(recipeOutput);
         buildFilterConversionRecipes(recipeOutput);
         buildFilterErasureRecipes(recipeOutput);
@@ -139,6 +140,17 @@ public class ConduitRecipes extends RecipeProvider {
                 .unlockedBy("has_ingredient", InventoryChangeTrigger.TriggerInstance.hasItems(EIOItems.CONDUIT_BINDER))
                 .save(recipeOutput, EnderIO.loc("enhanced_energy_conduit"));
 
+        ShapedRecipeBuilder
+                .shaped(RecipeCategory.BUILDING_BLOCKS, ConduitBlockItem.getStackFor(enhancedEnergyConduit, 8))
+                .pattern("BBB")
+                .pattern("ICI")
+                .pattern("BBB")
+                .define('B', EIOItems.CONDUIT_BINDER)
+                .define('C', ConduitIngredient.of(energyConduit))
+                .define('I', EIOTags.Items.INGOTS_ENERGETIC_ALLOY)
+                .unlockedBy("has_ingredient", InventoryChangeTrigger.TriggerInstance.hasItems(EIOItems.CONDUIT_BINDER))
+                .save(recipeOutput, EnderIO.loc("enhanced_energy_conduit_upgrade"));
+
         ShapedRecipeBuilder.shaped(RecipeCategory.BUILDING_BLOCKS, ConduitBlockItem.getStackFor(enderEnergyConduit, 8))
                 .pattern("BBB")
                 .pattern("III")
@@ -147,6 +159,17 @@ public class ConduitRecipes extends RecipeProvider {
                 .define('I', EIOTags.Items.INGOTS_VIBRANT_ALLOY)
                 .unlockedBy("has_ingredient", InventoryChangeTrigger.TriggerInstance.hasItems(EIOItems.CONDUIT_BINDER))
                 .save(recipeOutput, EnderIO.loc("ender_energy_conduit"));
+
+        ShapedRecipeBuilder
+            .shaped(RecipeCategory.BUILDING_BLOCKS, ConduitBlockItem.getStackFor(enderEnergyConduit, 8))
+            .pattern("BBB")
+            .pattern("ICI")
+            .pattern("BBB")
+            .define('B', EIOItems.CONDUIT_BINDER)
+            .define('C', ConduitIngredient.of(enhancedEnergyConduit))
+            .define('I', EIOTags.Items.INGOTS_VIBRANT_ALLOY)
+            .unlockedBy("has_ingredient", InventoryChangeTrigger.TriggerInstance.hasItems(EIOItems.CONDUIT_BINDER))
+            .save(recipeOutput, EnderIO.loc("ender_energy_conduit_upgrade"));
 
         ShapedRecipeBuilder.shaped(RecipeCategory.BUILDING_BLOCKS, ConduitBlockItem.getStackFor(redstoneConduit, 8))
                 .pattern("BBB")
@@ -177,95 +200,18 @@ public class ConduitRecipes extends RecipeProvider {
 
     private void buildFilterErasureRecipes(RecipeOutput recipeOutput) {
         // List of all filter items to create erasure recipes for
-        ItemLike[] filterItems = {
-            ConduitItems.OR_FILTER,
-            ConduitItems.NOR_FILTER,
-            ConduitItems.AND_FILTER,
-            ConduitItems.NAND_FILTER,
-            ConduitItems.XOR_FILTER,
-            ConduitItems.XNOR_FILTER,
-            ConduitItems.COUNT_FILTER,
-            ConduitItems.TIMER_FILTER
-        };
+        ItemLike[] filterItems = { ConduitItems.OR_FILTER, ConduitItems.NOR_FILTER, ConduitItems.AND_FILTER,
+                ConduitItems.NAND_FILTER, ConduitItems.XOR_FILTER, ConduitItems.XNOR_FILTER, ConduitItems.COUNT_FILTER,
+                ConduitItems.TIMER_FILTER };
 
         // Create erasure recipe for each filter
         for (ItemLike filter : filterItems) {
             String path = BuiltInRegistries.ITEM.getKey(filter.asItem()).getPath();
             ShapelessRecipeBuilder.shapeless(RecipeCategory.MISC, filter)
-                .requires(filter)
-                .unlockedBy("has_ingredient", has(filter))
-                .save(recipeOutput, EnderIO.loc(path + "_erasure"));
+                    .requires(filter)
+                    .unlockedBy("has_ingredient", has(filter))
+                    .save(recipeOutput, EnderIO.loc(path + "_erasure"));
         }
-    }
-
-    private void buildUpgradeRecipes(RecipeOutput recipeOutput) {
-        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ConduitItems.EXTRACTION_SPEED_UPGRADE_1.get(), 2)
-                .pattern("III")
-                .pattern("APA")
-                .pattern("ATA")
-                .define('I', Tags.Items.INGOTS_IRON)
-                .define('P', Items.PISTON)
-                .define('T', Items.REDSTONE_TORCH)
-                .define('A', EIOTags.Items.INGOTS_REDSTONE_ALLOY)
-                .unlockedBy("has_ingredient",
-                        InventoryChangeTrigger.TriggerInstance.hasItems(EIOItems.REDSTONE_ALLOY_INGOT))
-                .save(recipeOutput);
-
-        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ConduitItems.EXTRACTION_SPEED_UPGRADE_2.get(), 2)
-                .pattern("III")
-                .pattern("APA")
-                .pattern("ATA")
-                .define('I', Tags.Items.INGOTS_IRON)
-                .define('P', Items.PISTON)
-                .define('T', Items.REDSTONE_TORCH)
-                .define('A', EIOTags.Items.INGOTS_CONDUCTIVE_ALLOY)
-                .unlockedBy("has_ingredient",
-                        InventoryChangeTrigger.TriggerInstance.hasItems(EIOItems.CONDUCTIVE_ALLOY_INGOT))
-                .save(recipeOutput);
-
-        ShapelessRecipeBuilder.shapeless(RecipeCategory.MISC, ConduitItems.EXTRACTION_SPEED_UPGRADE_2)
-                .requires(ConduitItems.EXTRACTION_SPEED_UPGRADE_1)
-                .requires(Ingredient.of(EIOTags.Items.INGOTS_CONDUCTIVE_ALLOY), 2)
-                .unlockedBy("has_ingredient",
-                        InventoryChangeTrigger.TriggerInstance.hasItems(EIOItems.CONDUCTIVE_ALLOY_INGOT))
-                .save(recipeOutput, EnderIO.loc("extraction_speed_upgrade_1_upgrade"));
-
-        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ConduitItems.EXTRACTION_SPEED_UPGRADE_3.get(), 2)
-                .pattern("III")
-                .pattern("APA")
-                .pattern("ATA")
-                .define('I', EIOTags.Items.INGOTS_DARK_STEEL)
-                .define('P', Items.PISTON)
-                .define('T', Items.REDSTONE_TORCH)
-                .define('A', EIOTags.Items.INGOTS_SOULARIUM)
-                .unlockedBy("has_ingredient", InventoryChangeTrigger.TriggerInstance.hasItems(EIOItems.SOULARIUM_INGOT))
-                .save(recipeOutput);
-
-        ShapelessRecipeBuilder.shapeless(RecipeCategory.MISC, ConduitItems.EXTRACTION_SPEED_UPGRADE_3)
-                .requires(ConduitItems.EXTRACTION_SPEED_UPGRADE_2)
-                .requires(Ingredient.of(EIOTags.Items.INGOTS_SOULARIUM), 2)
-                .unlockedBy("has_ingredient",
-                        InventoryChangeTrigger.TriggerInstance.hasItems(EIOItems.CONDUCTIVE_ALLOY_INGOT))
-                .save(recipeOutput, EnderIO.loc("extraction_speed_upgrade_2_upgrade"));
-
-        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ConduitItems.EXTRACTION_SPEED_UPGRADE_4.get(), 2)
-                .pattern("III")
-                .pattern("APA")
-                .pattern("ATA")
-                .define('I', EIOTags.Items.INGOTS_DARK_STEEL)
-                .define('P', Items.PISTON)
-                .define('T', Items.REDSTONE_TORCH)
-                .define('A', EIOTags.Items.INGOTS_ENERGETIC_ALLOY)
-                .unlockedBy("has_ingredient",
-                        InventoryChangeTrigger.TriggerInstance.hasItems(EIOItems.ENERGETIC_ALLOY_INGOT))
-                .save(recipeOutput);
-
-        ShapelessRecipeBuilder.shapeless(RecipeCategory.MISC, ConduitItems.EXTRACTION_SPEED_UPGRADE_4)
-                .requires(ConduitItems.EXTRACTION_SPEED_UPGRADE_3)
-                .requires(Ingredient.of(EIOTags.Items.INGOTS_ENERGETIC_ALLOY), 2)
-                .unlockedBy("has_ingredient",
-                        InventoryChangeTrigger.TriggerInstance.hasItems(EIOItems.ENERGETIC_ALLOY_INGOT))
-                .save(recipeOutput, EnderIO.loc("extraction_speed_upgrade_3_upgrade"));
     }
 
     private void buildFilterRecipes(RecipeOutput recipeOutput) {
@@ -379,51 +325,51 @@ public class ConduitRecipes extends RecipeProvider {
 
     private void buildFacadeCraftingRecipes(RecipeOutput recipeOutput) {
         ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ConduitItems.CONDUIT_FACADE)
-            .pattern("BBB")
-            .pattern("B B")
-            .pattern("BBB")
-            .define('B', EIOItems.CONDUIT_BINDER)
-            .unlockedBy("has_ingredient", InventoryChangeTrigger.TriggerInstance.hasItems(EIOItems.CONDUIT_BINDER))
-            .save(recipeOutput);
+                .pattern("BBB")
+                .pattern("B B")
+                .pattern("BBB")
+                .define('B', EIOItems.CONDUIT_BINDER)
+                .unlockedBy("has_ingredient", InventoryChangeTrigger.TriggerInstance.hasItems(EIOItems.CONDUIT_BINDER))
+                .save(recipeOutput);
 
         ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ConduitItems.HARDENED_CONDUIT_FACADE)
-            .pattern(" O ")
-            .pattern("OFO")
-            .pattern(" O ")
-            .define('O', EIOTags.Items.DUSTS_OBSIDIAN)
-            .define('F', ConduitItems.CONDUIT_FACADE)
-            .unlockedBy("has_ingredient", InventoryChangeTrigger.TriggerInstance.hasItems(EIOItems.CONDUIT_BINDER))
-            .save(recipeOutput);
+                .pattern(" O ")
+                .pattern("OFO")
+                .pattern(" O ")
+                .define('O', EIOTags.Items.DUSTS_OBSIDIAN)
+                .define('F', ConduitItems.CONDUIT_FACADE)
+                .unlockedBy("has_ingredient", InventoryChangeTrigger.TriggerInstance.hasItems(EIOItems.CONDUIT_BINDER))
+                .save(recipeOutput);
 
         ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ConduitItems.TRANSPARENT_CONDUIT_FACADE)
-            .pattern("BBB")
-            .pattern("BGB")
-            .pattern("BBB")
-            .define('B', EIOItems.CONDUIT_BINDER)
-            .define('G', EIOTags.Items.CLEAR_GLASS)
-            .unlockedBy("has_ingredient", InventoryChangeTrigger.TriggerInstance.hasItems(EIOItems.CONDUIT_BINDER))
-            .save(recipeOutput);
+                .pattern("BBB")
+                .pattern("BGB")
+                .pattern("BBB")
+                .define('B', EIOItems.CONDUIT_BINDER)
+                .define('G', EIOTags.Items.CLEAR_GLASS)
+                .unlockedBy("has_ingredient", InventoryChangeTrigger.TriggerInstance.hasItems(EIOItems.CONDUIT_BINDER))
+                .save(recipeOutput);
 
         ShapelessRecipeBuilder.shapeless(RecipeCategory.MISC, ConduitItems.TRANSPARENT_CONDUIT_FACADE)
-            .requires(ConduitItems.CONDUIT_FACADE)
-            .requires(EIOTags.Items.CLEAR_GLASS)
-            .unlockedBy("has_ingredient", InventoryChangeTrigger.TriggerInstance.hasItems(EIOItems.CONDUIT_BINDER))
-            .save(recipeOutput, EnderIO.loc("transparent_conduit_facade_from_conduit_facade"));
+                .requires(ConduitItems.CONDUIT_FACADE)
+                .requires(EIOTags.Items.CLEAR_GLASS)
+                .unlockedBy("has_ingredient", InventoryChangeTrigger.TriggerInstance.hasItems(EIOItems.CONDUIT_BINDER))
+                .save(recipeOutput, EnderIO.loc("transparent_conduit_facade_from_conduit_facade"));
 
         ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ConduitItems.TRANSPARENT_HARDENED_CONDUIT_FACADE)
-            .pattern(" O ")
-            .pattern("OFO")
-            .pattern(" O ")
-            .define('O', EIOTags.Items.DUSTS_OBSIDIAN)
-            .define('F', ConduitItems.TRANSPARENT_CONDUIT_FACADE)
-            .unlockedBy("has_ingredient", InventoryChangeTrigger.TriggerInstance.hasItems(EIOItems.CONDUIT_BINDER))
-            .save(recipeOutput);
+                .pattern(" O ")
+                .pattern("OFO")
+                .pattern(" O ")
+                .define('O', EIOTags.Items.DUSTS_OBSIDIAN)
+                .define('F', ConduitItems.TRANSPARENT_CONDUIT_FACADE)
+                .unlockedBy("has_ingredient", InventoryChangeTrigger.TriggerInstance.hasItems(EIOItems.CONDUIT_BINDER))
+                .save(recipeOutput);
 
         ShapelessRecipeBuilder.shapeless(RecipeCategory.MISC, ConduitItems.TRANSPARENT_HARDENED_CONDUIT_FACADE)
-            .requires(ConduitItems.HARDENED_CONDUIT_FACADE)
-            .requires(EIOTags.Items.CLEAR_GLASS)
-            .unlockedBy("has_ingredient", InventoryChangeTrigger.TriggerInstance.hasItems(EIOItems.CONDUIT_BINDER))
-            .save(recipeOutput, EnderIO.loc("transparent_hardened_conduit_facade_from_hardened_conduit_facade"));
+                .requires(ConduitItems.HARDENED_CONDUIT_FACADE)
+                .requires(EIOTags.Items.CLEAR_GLASS)
+                .unlockedBy("has_ingredient", InventoryChangeTrigger.TriggerInstance.hasItems(EIOItems.CONDUIT_BINDER))
+                .save(recipeOutput, EnderIO.loc("transparent_hardened_conduit_facade_from_hardened_conduit_facade"));
     }
 
     private void buildFacadePaintingRecipes(RecipeOutput recipeOutput) {

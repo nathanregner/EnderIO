@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
 import me.liliandev.ensure.ensures.EnsureSide;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -38,9 +39,8 @@ public class EnderBlockEntity extends BlockEntity {
 
     public static final String DATA = "Data";
     public static final String INDEX = "Index";
-    private final List<NetworkDataSlot<?>> dataSlots = new ArrayList<>();
-    private final List<Runnable> afterDataSync = new ArrayList<>();
-    private boolean isChangedDeferred = true;
+    private final List<NetworkDataSlot<?>> dataSlots = new CopyOnWriteArrayList<>();
+    private final List<Runnable> afterDataSync = new CopyOnWriteArrayList<>();
 
     private final Map<BlockCapability<?, ?>, EnumMap<Direction, BlockCapabilityCache<?, ?>>> selfCapabilities = new HashMap<>();
     private final Map<BlockCapability<?, ?>, EnumMap<Direction, BlockCapabilityCache<?, ?>>> neighbourCapabilities = new HashMap<>();
@@ -77,25 +77,12 @@ public class EnderBlockEntity extends BlockEntity {
      */
     @EnsureSide(EnsureSide.Side.CLIENT)
     public void clientTick() {
-
     }
 
     /**
      * Perform client and server side ticking.
      */
     public void endTick() {
-        if (this.level == null) {
-            return;
-        }
-        if (isChangedDeferred) {
-            isChangedDeferred = false;
-            setChanged(level, getBlockPos(), getBlockState());
-        }
-    }
-
-    @Override
-    public void setChanged() {
-        this.isChangedDeferred = true;
     }
 
     // endregion
@@ -172,7 +159,9 @@ public class EnderBlockEntity extends BlockEntity {
             buf.writeInt(i);
             dataSlots.get(i).write(buf);
         });
-        return buf.array();
+        byte[] arr = buf.array();
+        buf.release();
+        return arr;
     }
 
     @Deprecated(forRemoval = true, since = "7.1")
@@ -201,6 +190,7 @@ public class EnderBlockEntity extends BlockEntity {
             buf.writeInt(dataSlots.indexOf(slot));
             slot.write(buf, value);
             PacketDistributor.sendToServer(new ClientboundDataSlotChange(getBlockPos(), buf.array()));
+            buf.release();
             level.sendBlockUpdated(getBlockPos(), getBlockState(), getBlockState(), Block.UPDATE_NEIGHBORS);
         }
     }
@@ -298,36 +288,19 @@ public class EnderBlockEntity extends BlockEntity {
         }
     }
 
+    // TODO: Ensure SERVER usage sometime.
     @Nullable
     protected <T> T getNeighbouringCapability(BlockCapability<T, Direction> capability, Direction side) {
-        if (level == null) {
+        if (level == null || !(level instanceof ServerLevel serverLevel)) {
             return null;
         }
 
-        if (!neighbourCapabilities.containsKey(capability)) {
-            // We've not seen this capability before, time to register it!
-            neighbourCapabilities.put(capability, new EnumMap<>(Direction.class));
-
-            for (Direction direction : Direction.values()) {
-                populateNeighbourCachesFor(direction, capability);
-            }
-        }
-
-        if (!neighbourCapabilities.get(capability).containsKey(side)) {
-            return null;
-        }
+        var sidedCaches = neighbourCapabilities.computeIfAbsent(capability, c -> new EnumMap<>(Direction.class));
+        var cache = sidedCaches.computeIfAbsent(side,
+                s -> BlockCapabilityCache.create(capability, serverLevel, getBlockPos().relative(s), s.getOpposite()));
 
         // noinspection unchecked
-        return (T) neighbourCapabilities.get(capability).get(side).getCapability();
-    }
-
-    private void populateNeighbourCachesFor(Direction direction, BlockCapability<?, Direction> capability) {
-        if (level instanceof ServerLevel serverLevel) {
-            BlockPos neighbourPos = getBlockPos().relative(direction);
-            neighbourCapabilities.get(capability)
-                    .put(direction, BlockCapabilityCache.create(capability, serverLevel, neighbourPos,
-                            direction.getOpposite()));
-        }
+        return (T) cache.getCapability();
     }
 
     // endregion

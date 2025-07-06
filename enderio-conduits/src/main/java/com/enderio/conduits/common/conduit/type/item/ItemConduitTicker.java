@@ -1,88 +1,110 @@
 package com.enderio.conduits.common.conduit.type.item;
 
-import com.enderio.base.api.filter.ItemStackFilter;
-import com.enderio.conduits.api.ColoredRedstoneProvider;
-import com.enderio.conduits.api.ConduitNetwork;
-import com.enderio.conduits.api.ticker.CapabilityAwareConduitTicker;
-import com.enderio.conduits.common.components.ExtractionSpeedUpgrade;
+import com.enderio.base.common.init.EIOCapabilities;
+import com.enderio.conduits.api.network.IConduitNetwork;
+import com.enderio.conduits.api.ticker.ConduitTicker;
 import com.enderio.conduits.common.init.ConduitTypes;
-import java.util.List;
-import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.capabilities.BlockCapability;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemHandlerHelper;
 
-public class ItemConduitTicker extends CapabilityAwareConduitTicker<ItemConduit, IItemHandler> {
+public class ItemConduitTicker implements ConduitTicker<ItemConduit> {
+
+    public static final ItemConduitTicker INSTANCE = new ItemConduitTicker();
 
     @Override
-    protected void tickCapabilityGraph(ServerLevel level, ItemConduit conduit, List<CapabilityConnection> inserts,
-            List<CapabilityConnection> extracts, ConduitNetwork graph,
-            ColoredRedstoneProvider coloredRedstoneProvider) {
-
-        toNextExtract: for (CapabilityConnection extract : extracts) {
-            IItemHandler extractHandler = extract.capability();
-            int extracted = 0;
-
-            int speed = conduit.transferRatePerCycle();
-            if (extract.upgrade() instanceof ExtractionSpeedUpgrade speedUpgrade) {
-                speed *= (int) Math.pow(2, speedUpgrade.tier());
-            }
-
-            nextItem: for (int i = 0; i < extractHandler.getSlots(); i++) {
-                ItemStack extractedItem = extractHandler.extractItem(i, speed - extracted, true);
-                if (extractedItem.isEmpty()) {
+    public void tick(ServerLevel level, ItemConduit conduit, IConduitNetwork network) {
+        for (var channel : network.allChannels()) {
+            toNextExtract: for (var extractConnection : network.extractConnections(channel)) {
+                var insertConnections = network.insertConnectionsFrom(extractConnection);
+                if (insertConnections.isEmpty()) {
                     continue;
                 }
 
-                if (extract.extractFilter() instanceof ItemStackFilter itemFilter) {
-                    if (!itemFilter.test(extractedItem)) {
-                        continue;
-                    }
+                // Get extract handler from the connection.
+                IItemHandler extractHandler = extractConnection.getSidedCapability(Capabilities.ItemHandler.BLOCK);
+                if (extractHandler == null) {
+                    continue;
                 }
 
-                ItemConduitData.ItemSidedData sidedExtractData = extract.node()
-                        .getOrCreateData(ConduitTypes.Data.ITEM.get())
-                        .compute(extract.direction());
+                // Get node data for round robin index and connection config
+                var nodeData = extractConnection.node().getOrCreateNodeData(ConduitTypes.NodeData.ITEM.get());
+                var connectionConfig = extractConnection.connectionConfig(ConduitTypes.ConnectionTypes.ITEM.get());
 
-                if (sidedExtractData.isRoundRobin) {
-                    if (inserts.size() <= sidedExtractData.rotatingIndex) {
-                        sidedExtractData.rotatingIndex = 0;
-                    }
-                } else {
-                    sidedExtractData.rotatingIndex = 0;
-                }
+                // Get extraction filter
+                var extractFilter = extractConnection.inventory()
+                        .getStackInSlot(ItemConduit.EXTRACT_FILTER_SLOT)
+                        .getCapability(EIOCapabilities.ITEM_FILTER);
 
-                for (int j = sidedExtractData.rotatingIndex; j < sidedExtractData.rotatingIndex + inserts.size(); j++) {
-                    int insertIndex = j % inserts.size();
-                    CapabilityConnection insert = inserts.get(insertIndex);
+                int extracted = 0;
+                int speed = conduit.transferRatePerCycle();
 
-                    if (!sidedExtractData.isSelfFeed && extract.direction() == insert.direction()
-                            && extract.pos() == insert.pos()) {
+                nextItem: for (int i = 0; i < extractHandler.getSlots(); i++) {
+                    ItemStack extractedItem = extractHandler.extractItem(i, speed - extracted, true);
+                    if (extractedItem.isEmpty()) {
                         continue;
                     }
 
-                    if (insert.insertFilter() instanceof ItemStackFilter itemFilter) {
-                        if (!itemFilter.test(extractedItem)) {
+                    if (extractFilter != null) {
+                        extractedItem = extractFilter.test(extractHandler, extractedItem);
+                        if (extractedItem.isEmpty()) {
                             continue;
                         }
                     }
 
-                    ItemStack notInserted = ItemHandlerHelper.insertItem(insert.capability(), extractedItem, false);
-                    int successfullyInserted = extractedItem.getCount() - notInserted.getCount();
+                    int startingIndex = 0;
+                    if (connectionConfig.isRoundRobin()) {
+                        startingIndex = nodeData.getIndex(extractConnection.connectionSide());
+                        if (insertConnections.size() <= startingIndex) {
+                            startingIndex = 0;
+                        }
+                    }
 
-                    if (successfullyInserted > 0) {
-                        extracted += successfullyInserted;
-                        extractHandler.extractItem(i, successfullyInserted, false);
-                        if (extracted >= speed || isEmpty(extractHandler, i + 1)) {
-                            if (sidedExtractData.isRoundRobin) {
-                                sidedExtractData.rotatingIndex = insertIndex + 1;
+                    for (int j = startingIndex; j < startingIndex + insertConnections.size(); j++) {
+                        int senderIndex = j % insertConnections.size();
+                        var insertConnection = insertConnections.get(senderIndex);
+
+                        var insertHandler = insertConnection.getSidedCapability(Capabilities.ItemHandler.BLOCK);
+                        if (insertHandler == null) {
+                            continue;
+                        }
+
+                        // Prevent self-feeding
+                        if (!connectionConfig.isSelfFeed()
+                                && extractConnection.connectionSide() == insertConnection.connectionSide()
+                                && extractConnection.node() == insertConnection.node()) {
+                            continue;
+                        }
+
+                        var insertFilter = insertConnection.inventory()
+                                .getStackInSlot(ItemConduit.INSERT_FILTER_SLOT)
+                                .getCapability(EIOCapabilities.ITEM_FILTER);
+
+                        ItemStack itemToInsert = extractedItem.copy();
+                        if (insertFilter != null) {
+                            itemToInsert = insertFilter.test(
+                                    insertConnection.getSidedCapability(Capabilities.ItemHandler.BLOCK), itemToInsert);
+                            if (itemToInsert.isEmpty()) {
+                                continue;
                             }
-                            continue toNextExtract;
-                        } else {
-                            continue nextItem;
+                        }
+
+                        ItemStack notInserted = ItemHandlerHelper.insertItem(insertHandler, itemToInsert, false);
+                        int successfullyInserted = itemToInsert.getCount() - notInserted.getCount();
+
+                        if (successfullyInserted > 0) {
+                            extracted += successfullyInserted;
+                            extractHandler.extractItem(i, successfullyInserted, false);
+                            if (extracted >= speed || isEmpty(extractHandler, i + 1)) {
+                                if (connectionConfig.isRoundRobin()) {
+                                    nodeData.setIndex(extractConnection.connectionSide(), senderIndex + 1);
+                                }
+                                continue toNextExtract;
+                            } else {
+                                continue nextItem;
+                            }
                         }
                     }
                 }
@@ -90,6 +112,7 @@ public class ItemConduitTicker extends CapabilityAwareConduitTicker<ItemConduit,
         }
     }
 
+    // TODO: is this necessary?
     private boolean isEmpty(IItemHandler itemHandler, int afterIndex) {
         for (var i = afterIndex; i < itemHandler.getSlots(); i++) {
             if (!itemHandler.getStackInSlot(i).isEmpty()) {
@@ -98,10 +121,5 @@ public class ItemConduitTicker extends CapabilityAwareConduitTicker<ItemConduit,
         }
 
         return true;
-    }
-
-    @Override
-    protected BlockCapability<IItemHandler, Direction> getCapability() {
-        return Capabilities.ItemHandler.BLOCK;
     }
 }

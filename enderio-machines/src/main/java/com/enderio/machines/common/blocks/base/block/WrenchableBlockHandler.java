@@ -8,7 +8,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.UseItemOnBlockEvent;
 
-@EventBusSubscriber(bus = EventBusSubscriber.Bus.GAME, modid = EnderIOMachines.MODULE_MOD_ID)
+@EventBusSubscriber(modid = EnderIOMachines.MODULE_MOD_ID)
 public class WrenchableBlockHandler {
     @SubscribeEvent
     public static void onItemUse(UseItemOnBlockEvent event) {
@@ -19,8 +19,7 @@ public class WrenchableBlockHandler {
         }
 
         if (level.getBlockEntity(event.getPos()) instanceof Wrenchable blockEntity) {
-            var direction = event.getUseOnContext().getHitResult().getDirection();
-            var result = blockEntity.onWrenched(event.getPlayer(), direction);
+            var result = blockEntity.onWrenched(event.getUseOnContext());
             if (result != ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION) {
                 event.cancelWithResult(result);
             }

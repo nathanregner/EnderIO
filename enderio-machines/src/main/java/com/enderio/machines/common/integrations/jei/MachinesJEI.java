@@ -1,35 +1,36 @@
 package com.enderio.machines.common.integrations.jei;
 
 import com.enderio.base.api.EnderIO;
-import com.enderio.base.common.integrations.jei.subtype.EntityStorageSubtypeInterpreter;
+import com.enderio.base.common.integrations.jei.subtype.SoulBindableSubtypeInterpreter;
 import com.enderio.machines.client.gui.screen.AlloySmelterScreen;
 import com.enderio.machines.client.gui.screen.EnchanterScreen;
 import com.enderio.machines.client.gui.screen.FluidTankScreen;
-import com.enderio.machines.client.gui.screen.PrimitiveAlloySmelterScreen;
 import com.enderio.machines.client.gui.screen.SagMillScreen;
 import com.enderio.machines.client.gui.screen.SlicerScreen;
 import com.enderio.machines.client.gui.screen.SoulBinderScreen;
 import com.enderio.machines.client.gui.screen.VatScreen;
+import com.enderio.machines.client.gui.screen.WeatherObeliskScreen;
 import com.enderio.machines.client.gui.screen.base.MachineScreen;
 import com.enderio.machines.common.blocks.alloy.AlloySmelterMenu;
-import com.enderio.machines.common.blocks.alloy.PrimitiveAlloySmelterMenu;
 import com.enderio.machines.common.blocks.enchanter.EnchanterMenu;
 import com.enderio.machines.common.blocks.sag_mill.SagMillMenu;
 import com.enderio.machines.common.blocks.slicer.SlicerMenu;
 import com.enderio.machines.common.blocks.soul_binder.SoulBinderMenu;
-import com.enderio.machines.common.blocks.vat.VatMenu;
 import com.enderio.machines.common.init.MachineBlocks;
 import com.enderio.machines.common.init.MachineMenus;
 import com.enderio.machines.common.integrations.jei.category.AlloySmeltingCategory;
 import com.enderio.machines.common.integrations.jei.category.EnchanterCategory;
-import com.enderio.machines.common.integrations.jei.category.PrimitiveAlloySmeltingCategory;
 import com.enderio.machines.common.integrations.jei.category.SagMillCategory;
 import com.enderio.machines.common.integrations.jei.category.SlicingRecipeCategory;
 import com.enderio.machines.common.integrations.jei.category.SoulBindingCategory;
 import com.enderio.machines.common.integrations.jei.category.SoulEngineCategory;
 import com.enderio.machines.common.integrations.jei.category.TankCategory;
 import com.enderio.machines.common.integrations.jei.category.VATCategory;
+import com.enderio.machines.common.integrations.jei.category.WeatherChangeCategory;
 import com.enderio.machines.common.integrations.jei.transfer.CrafterRecipeTransferHandler;
+import com.enderio.machines.common.integrations.jei.transfer.FluidTankTransferHelper;
+import com.enderio.machines.common.integrations.jei.transfer.VATTransferHelper;
+import com.enderio.machines.common.integrations.jei.transfer.WeatherObeliskTransferHelper;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
 import mezz.jei.api.constants.RecipeTypes;
@@ -51,8 +52,6 @@ public class MachinesJEI implements IModPlugin {
 
     @Override
     public void registerRecipeCatalysts(IRecipeCatalystRegistration registration) {
-        registration.addRecipeCatalyst(new ItemStack(MachineBlocks.PRIMITIVE_ALLOY_SMELTER.get()),
-                PrimitiveAlloySmeltingCategory.TYPE);
         registration.addRecipeCatalyst(new ItemStack(MachineBlocks.ALLOY_SMELTER.get()), AlloySmeltingCategory.TYPE,
                 RecipeTypes.SMELTING);
         registration.addRecipeCatalyst(new ItemStack(MachineBlocks.ENCHANTER.get()), EnchanterCategory.TYPE);
@@ -63,35 +62,35 @@ public class MachinesJEI implements IModPlugin {
         registration.addRecipeCatalyst(new ItemStack(MachineBlocks.PRESSURIZED_FLUID_TANK.get()), TankCategory.TYPE);
         registration.addRecipeCatalyst(new ItemStack(MachineBlocks.SOUL_ENGINE.get()), SoulEngineCategory.TYPE);
         registration.addRecipeCatalyst(new ItemStack(MachineBlocks.VAT.get()), VATCategory.TYPE);
+        registration.addRecipeCatalyst(new ItemStack(MachineBlocks.WEATHER_OBELISK.get()), WeatherChangeCategory.TYPE);
     }
 
     @Override
     public void registerCategories(IRecipeCategoryRegistration registration) {
         registration.addRecipeCategories(new AlloySmeltingCategory(registration.getJeiHelpers().getGuiHelper()));
         registration.addRecipeCategories(new EnchanterCategory(registration.getJeiHelpers().getGuiHelper()));
-        registration
-                .addRecipeCategories(new PrimitiveAlloySmeltingCategory(registration.getJeiHelpers().getGuiHelper()));
         registration.addRecipeCategories(new SagMillCategory(registration.getJeiHelpers().getGuiHelper()));
         registration.addRecipeCategories(new SlicingRecipeCategory(registration.getJeiHelpers().getGuiHelper()));
         registration.addRecipeCategories(new SoulBindingCategory(registration.getJeiHelpers().getGuiHelper()));
         registration.addRecipeCategories(new TankCategory(registration.getJeiHelpers().getGuiHelper()));
         registration.addRecipeCategories(new SoulEngineCategory(registration.getJeiHelpers().getGuiHelper()));
         registration.addRecipeCategories(new VATCategory(registration.getJeiHelpers().getGuiHelper()));
+        registration.addRecipeCategories(new WeatherChangeCategory(registration.getJeiHelpers().getGuiHelper()));
     }
 
     @Override
     public void registerRecipes(IRecipeRegistration registration) {
         MachineJEIRecipes recipes = new MachineJEIRecipes();
 
-        registration.addRecipes(AlloySmeltingCategory.TYPE, recipes.getAlloySmeltingRecipesWithSmelting());
+        registration.addRecipes(AlloySmeltingCategory.TYPE, recipes.getAlloySmeltingRecipes());
         registration.addRecipes(EnchanterCategory.TYPE, recipes.getEnchanterRecipes());
-        registration.addRecipes(PrimitiveAlloySmeltingCategory.TYPE, recipes.getAlloySmeltingRecipes());
         registration.addRecipes(SagMillCategory.TYPE, recipes.getSagMillingRecipes());
         registration.addRecipes(SlicingRecipeCategory.TYPE, recipes.getSlicingRecipes());
         registration.addRecipes(SoulBindingCategory.TYPE, recipes.getSoulBindingRecipes());
         registration.addRecipes(TankCategory.TYPE, recipes.getTankRecipes());
         registration.addRecipes(SoulEngineCategory.TYPE, recipes.getMobGeneratorRecipes());
         registration.addRecipes(VATCategory.TYPE, recipes.getVATRecipes());
+        registration.addRecipes(WeatherChangeCategory.TYPE, recipes.getWeatherRecipes());
     }
 
     @Override
@@ -102,11 +101,6 @@ public class MachinesJEI implements IModPlugin {
 
         registration.addRecipeTransferHandler(EnchanterMenu.class, MachineMenus.ENCHANTER.get(), EnchanterCategory.TYPE,
                 EnchanterMenu.INPUTS_INDEX, EnchanterMenu.INPUT_COUNT, EnchanterMenu.LAST_INDEX + 1, 36);
-
-        registration.addRecipeTransferHandler(PrimitiveAlloySmelterMenu.class,
-                MachineMenus.PRIMITIVE_ALLOY_SMELTER.get(), AlloySmeltingCategory.TYPE,
-                PrimitiveAlloySmelterMenu.INPUTS_INDEX, PrimitiveAlloySmelterMenu.INPUT_COUNT,
-                PrimitiveAlloySmelterMenu.LAST_INDEX + 1, 36);
 
         registration.addRecipeTransferHandler(SagMillMenu.class, MachineMenus.SAG_MILL.get(), SagMillCategory.TYPE,
                 SagMillMenu.INPUTS_INDEX, SagMillMenu.INPUT_COUNT, SagMillMenu.LAST_INDEX + 1, 36);
@@ -119,23 +113,28 @@ public class MachinesJEI implements IModPlugin {
                 SoulBindingCategory.TYPE, SoulBinderMenu.INPUTS_INDEX, SoulBinderMenu.INPUT_COUNT,
                 SoulBinderMenu.LAST_INDEX + 1, 36);
 
-        registration.addRecipeTransferHandler(VatMenu.class, MachineMenus.VAT.get(), VATCategory.TYPE,
-                VatMenu.INPUTS_INDEX, VatMenu.INPUT_COUNT, VatMenu.LAST_INDEX + 1, 36);
+        registration.addRecipeTransferHandler(new VATTransferHelper(registration.getTransferHelper()), VATCategory.TYPE);
 
         registration.addRecipeTransferHandler(new CrafterRecipeTransferHandler(registration.getTransferHelper()),
                 RecipeTypes.CRAFTING);
+
+        registration.addRecipeTransferHandler(new WeatherObeliskTransferHelper(registration.getTransferHelper()), WeatherChangeCategory.TYPE);
+
+        registration.addRecipeTransferHandler(new FluidTankTransferHelper(registration.getTransferHelper()), TankCategory.TYPE);
+
+
     }
 
     @Override
     public void registerItemSubtypes(ISubtypeRegistration registration) {
         registration.registerSubtypeInterpreter(MachineBlocks.POWERED_SPAWNER.asItem(),
-                new EntityStorageSubtypeInterpreter());
+                new SoulBindableSubtypeInterpreter());
 
         registration.registerSubtypeInterpreter(MachineBlocks.SOUL_ENGINE.asItem(),
-                new EntityStorageSubtypeInterpreter());
+                new SoulBindableSubtypeInterpreter());
 
         for (var solarPanel : MachineBlocks.SOLAR_PANELS.values()) {
-            registration.registerSubtypeInterpreter(solarPanel.asItem(), new EntityStorageSubtypeInterpreter());
+            registration.registerSubtypeInterpreter(solarPanel.asItem(), new SoulBindableSubtypeInterpreter());
         }
     }
 
@@ -155,12 +154,11 @@ public class MachinesJEI implements IModPlugin {
 
         // TODO: Painting machine needs a viewer
 
-        registration.addRecipeClickArea(PrimitiveAlloySmelterScreen.class, 79, 35, 24, 17,
-                PrimitiveAlloySmeltingCategory.TYPE);
         registration.addRecipeClickArea(SagMillScreen.class, 80, 47, 16, 24, SagMillCategory.TYPE);
         registration.addRecipeClickArea(SlicerScreen.class, 98, 61, 24, 16, SlicingRecipeCategory.TYPE);
         registration.addRecipeClickArea(SoulBinderScreen.class, 80, 34, 24, 17, SoulBindingCategory.TYPE);
         registration.addRecipeClickArea(VatScreen.class, 75, 33, 28, 30, VATCategory.TYPE);
+        registration.addRecipeClickArea(WeatherObeliskScreen.class, 80, 27, 14, 34, WeatherChangeCategory.TYPE);
 
         registration.addGhostIngredientHandler(MachineScreen.class, new MachinesGhostSlotHandler());
     }
