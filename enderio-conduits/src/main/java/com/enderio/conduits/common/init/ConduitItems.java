@@ -128,27 +128,6 @@ public class ConduitItems {
         .setTab(EIOCreativeTabs.GEAR)
         .addItemTags(EIOTags.Items.HIDE_FACADES);
 
-    public static final RegiliteItem<ConduitProbeItem> CONDUIT_PROBE = ITEM_REGISTRY
-        .registerItem("conduit_probe", ConduitProbeItem::new)
-//        .setModelProvider((prov, ctx) -> {
-//            var generatedItem = EnderIO.loc("item/generated");
-//            prov
-//                .withExistingParent(ctx.getName(), generatedItem)
-//                .texture("layer0", EnderIO.loc("item/conduit_probe_probe"))
-//                .override()
-//                .predicate(ResourceLocation.parse(CONDUIT_PROBE_STATE.getRegisteredName()), ConduitProbeItem.State.PROBE.ordinal())
-//                .model(prov.withExistingParent("conduit_probe_probe", generatedItem)
-//                    .texture("layer0", EnderIO.loc("item/conduit_probe_probe")))
-//                .end()
-//                .override()
-//                .predicate(ResourceLocation.parse(CONDUIT_PROBE_STATE.getRegisteredName()), ConduitProbeItem.State.COPY_PASTE.ordinal())
-//                .model(prov.withExistingParent("conduit_probe_copy", generatedItem)
-//                    .texture("layer0", EnderIO.loc("item/conduit_probe_copy")))
-//                .end();
-//        })
-        .setTab(EIOCreativeTabs.GEAR)
-        .addItemTags(EIOTags.Items.HIDE_FACADES);
-
     public static <T> RegiliteItem<RedstoneFilterItem> createRedstoneFilter(String name,
             DeferredHolder<DataComponentType<?>, DataComponentType<T>> type, T defaultValue,
         @Nullable Supplier<MenuType<?>> menu) {

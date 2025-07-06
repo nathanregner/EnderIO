@@ -48,6 +48,8 @@ public class ConduitRecipes extends RecipeProvider {
                 .lookupOrThrow(EnderIOConduitsRegistries.Keys.CONDUIT);
 
         var itemConduit = conduitRegistry.getOrThrow(Conduits.ITEM);
+        var enhancedItemConduit = conduitRegistry.getOrThrow(Conduits.ENHANCED_ITEM);
+        var enderItemConduit = conduitRegistry.getOrThrow(Conduits.ENDER_ITEM);
         var fluidConduit = conduitRegistry.getOrThrow(Conduits.FLUID);
         var pressurizedFluidConduit = conduitRegistry.getOrThrow(Conduits.PRESSURIZED_FLUID);
         var enderFluidConduit = conduitRegistry.getOrThrow(Conduits.ENDER_FLUID);
@@ -62,14 +64,35 @@ public class ConduitRecipes extends RecipeProvider {
         buildFacadeCraftingRecipes(recipeOutput);
         buildFacadePaintingRecipes(recipeOutput);
 
-        ShapedRecipeBuilder.shaped(RecipeCategory.BUILDING_BLOCKS, ConduitBlockItem.getStackFor(itemConduit, 8))
-                .pattern("BBB")
-                .pattern("PPP")
-                .pattern("BBB")
-                .define('B', EIOItems.CONDUIT_BINDER)
-                .define('P', EIOTags.Items.NUGGETS_PULSATING_ALLOY)
-                .unlockedBy("has_ingredient", InventoryChangeTrigger.TriggerInstance.hasItems(EIOItems.CONDUIT_BINDER))
-                .save(recipeOutput, EnderIO.loc("item_conduit"));
+        ShapedRecipeBuilder
+            .shaped(RecipeCategory.BUILDING_BLOCKS, ConduitBlockItem.getStackFor(itemConduit, 8))
+            .pattern("BBB")
+            .pattern("PPP")
+            .pattern("BBB")
+            .define('B', EIOItems.CONDUIT_BINDER)
+            .define('P', EIOTags.Items.NUGGETS_REDSTONE_ALLOY)
+            .unlockedBy("has_ingredient", InventoryChangeTrigger.TriggerInstance.hasItems(EIOItems.CONDUIT_BINDER))
+            .save(recipeOutput, EnderIO.loc("item_conduit"));
+
+        ShapedRecipeBuilder
+            .shaped(RecipeCategory.BUILDING_BLOCKS, ConduitBlockItem.getStackFor(enhancedItemConduit, 8))
+            .pattern("BBB")
+            .pattern("PPP")
+            .pattern("BBB")
+            .define('B', EIOItems.CONDUIT_BINDER)
+            .define('P', EIOTags.Items.NUGGETS_PULSATING_ALLOY)
+            .unlockedBy("has_ingredient", InventoryChangeTrigger.TriggerInstance.hasItems(EIOItems.CONDUIT_BINDER))
+            .save(recipeOutput, EnderIO.loc("enhanced_item_conduit"));
+
+        ShapedRecipeBuilder
+            .shaped(RecipeCategory.BUILDING_BLOCKS, ConduitBlockItem.getStackFor(enderItemConduit, 8))
+            .pattern("BBB")
+            .pattern("PPP")
+            .pattern("BBB")
+            .define('B', EIOItems.CONDUIT_BINDER)
+            .define('P', EIOTags.Items.NUGGETS_VIBRANT_ALLOY)
+            .unlockedBy("has_ingredient", InventoryChangeTrigger.TriggerInstance.hasItems(EIOItems.CONDUIT_BINDER))
+            .save(recipeOutput, EnderIO.loc("ender_item_conduit"));
 
         ShapedRecipeBuilder.shaped(RecipeCategory.BUILDING_BLOCKS, ConduitBlockItem.getStackFor(fluidConduit, 8))
                 .pattern("BBB")
