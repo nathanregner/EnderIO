@@ -6,7 +6,7 @@
       "item": "enderio:conduit_binder"
     },
     "P": {
-      "tag": "c:nuggets/redstone_alloy"
+      "tag": "c:nuggets/pulsating_alloy"
     }
   },
   "pattern": [
@@ -16,7 +16,7 @@
   ],
   "result": {
     "components": {
-      "enderio:conduit": "enderio:item"
+      "enderio:conduit": "enderio:enhanced_item"
     },
     "count": 8,
     "id": "enderio:conduit"
